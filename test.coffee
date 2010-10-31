@@ -3,6 +3,7 @@
 YAML = require './yaml'
 
 test = '''
+    ---
     item:
       seq: [1,2,3]
       float: 5.4
@@ -10,7 +11,13 @@ test = '''
     other:
       # Comment
       boolean: true
+
+    ---
+    - New document
+    - Has a sequence as root
   '''
 
-[document] = YAML.load test
-console.log document
+for document, i in YAML.load(test)
+  console.log "Document ##{i+1}"
+  console.log document
+  console.log ''

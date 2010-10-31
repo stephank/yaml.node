@@ -8,58 +8,47 @@ var binding = exports.capi = require('./binding');
 
 exports.parse = binding.parse;
 
+// FIXME: Handle tags and anchors. Parse scalars.
 exports.load = function(input) {
-  var documents = [], document = null;
+  var documents = [],
+      document;
+  
+  var stack       = [],
+      newValue    = function(v) { stack[0](v); },
+      pushHandler = function(h) { stack.unshift(h); },
+      popHandler  = function()  { stack.shift(); };
+
   binding.parse(input, {
-    onStreamStart: function(e) {
-      console.log("stream start");
-      console.log(e);
-    },
-
-    onStreamEnd: function(e) {
-      console.log("stream end");
-      console.log(e);
-    },
-
     onDocumentStart: function(e) {
-      console.log("document start");
-      console.log(e);
+      pushHandler(function(v) { document = v; });
     },
-
     onDocumentEnd: function(e) {
-      console.log("document end");
-      console.log(e);
+      popHandler();
+      documents.push(document);
     },
-
-    onAlias: function(e) {
-      console.log("alias");
-      console.log(e);
-    },
-
     onScalar: function(e) {
-      console.log("scalar");
-      console.log(e);
+      newValue(e.value);
     },
-
     onSequenceStart: function(e) {
-      console.log("sequence start");
-      console.log(e);
+      var sequence = [];
+      newValue(sequence);
+      pushHandler(function(v) { sequence.push(v); });
     },
-
     onSequenceEnd: function(e) {
-      console.log("sequence end");
-      console.log(e);
+      popHandler();
     },
-
     onMappingStart: function(e) {
-      console.log("mapping start");
-      console.log(e);
+      var mapping = {},
+          key,
+          keyHandler   = function(v) { key = v; pushHandler(valueHandler); },
+          valueHandler = function(v) { mapping[key] = v; popHandler(); };
+      newValue(mapping);
+      pushHandler(keyHandler);
     },
-
     onMappingEnd: function(e) {
-      console.log("mapping end");
-      console.log(e);
+      popHandler();
     }
   });
+
   return documents;
 };
