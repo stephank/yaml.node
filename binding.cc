@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Stéphan Kochen
+// YAML.node, © 2010 Stéphan Kochen
 // MIT-licensed. (See the included LICENSE file.)
 
 #include <v8.h>
