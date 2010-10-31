@@ -10,72 +10,61 @@
 using namespace v8;
 using namespace node;
 
-namespace yaml
-{
 
-static Handle<Value> ValueFromScalarNode(yaml_document_t *doc, yaml_node_t *node);
-static Handle<Value> ValueFromSequenceNode(yaml_document_t *doc, yaml_node_t *node);
-static Handle<Value> ValueFromMappingNode(yaml_document_t *doc, yaml_node_t *node);
-static Handle<Value> ValueFromNode(yaml_document_t *doc, yaml_node_t *node);
-static Handle<Value> Load(const Arguments &args);
+static Persistent<String> on_stream_start_symbol;
+static Persistent<String> on_stream_end_symbol;
+static Persistent<String> on_document_start_symbol;
+static Persistent<String> on_document_end_symbol;
+static Persistent<String> on_alias_symbol;
+static Persistent<String> on_scalar_symbol;
+static Persistent<String> on_sequence_start_symbol;
+static Persistent<String> on_sequence_end_symbol;
+static Persistent<String> on_mapping_start_symbol;
+static Persistent<String> on_mapping_end_symbol;
 
+static Persistent<String> start_symbol;
+static Persistent<String> end_symbol;
 
-static Handle<Value>
-ValueFromScalarNode(yaml_document_t *doc, yaml_node_t *node)
-{
-  return String::New((const char *)node->data.scalar.value, node->data.scalar.length);
-}
+static Persistent<String> index_symbol;
+static Persistent<String> line_symbol;
+static Persistent<String> column_symbol;
 
-
-static Handle<Value>
-ValueFromSequenceNode(yaml_document_t *doc, yaml_node_t *node)
-{
-  uint32_t length = node->data.sequence.items.top - node->data.sequence.items.start;
-  Local<Array> result = Array::New(length);
-  for (uint32_t i = 0; i < length; i++)
-    result->Set(i, ValueFromNode(doc,
-        yaml_document_get_node(doc, node->data.sequence.items.start[i])));
-  return result;
-}
+static Persistent<String> major_symbol;
+static Persistent<String> minor_symbol;
+static Persistent<String> version_symbol;
+static Persistent<String> implict_symbol;
 
 
-static Handle<Value>
-ValueFromMappingNode(yaml_document_t *doc, yaml_node_t *node)
-{
-  Local<Object> result = Object::New();
-  yaml_node_pair_t *pair = node->data.mapping.pairs.start;
-  while (pair < node->data.mapping.pairs.top) {
-    result->Set(ValueFromScalarNode(doc, yaml_document_get_node(doc, pair->key)),
-        ValueFromNode(doc, yaml_document_get_node(doc, pair->value)));
-    pair++;
-  }
-  return result;
-}
-
-
-static Handle<Value>
-ValueFromNode(yaml_document_t *doc, yaml_node_t *node)
-{
-  switch (node->type) {
-    case YAML_SCALAR_NODE:   return ValueFromScalarNode(doc, node);
-    case YAML_SEQUENCE_NODE: return ValueFromSequenceNode(doc, node);
-    case YAML_MAPPING_NODE:  return ValueFromMappingNode(doc, node);
-    default: return Null();
-  }
-}
-
-
-static Handle<Value>
-Load(const Arguments &args)
+/* Create an object like libyaml's mark. */
+static Local<Object>
+yaml_node_object_from_mark(yaml_mark_t &mark)
 {
   HandleScope scope;
-  Local<Array> documents = Array::New();
+  Local<Object> obj = Object::New();
+  obj->Set(index_symbol,  Integer::NewFromUnsigned(mark.index));
+  obj->Set(line_symbol,   Integer::NewFromUnsigned(mark.line));
+  obj->Set(column_symbol, Integer::NewFromUnsigned(mark.column));
+  return scope.Close(obj);
+}
+
+
+/* The workhorse. */
+static Handle<Value>
+yaml_node_parse(const Arguments &args)
+{
+  HandleScope scope;
 
   /* Check arguments */
-  if (args.Length() != 1)
-    return ThrowException(Exception::Error(String::New("One arguments was expected.")));
+  if (args.Length() != 2)
+    return ThrowException(Exception::Error(String::New("Two arguments were expected.")));
   if (!args[0]->IsString()) 
     return ThrowException(Exception::TypeError(String::New("Input must be a string.")));
+  if (!args[1]->IsObject()) 
+    return ThrowException(Exception::TypeError(String::New("Handler must be an object.")));
+
+  /* Dereference arguments. */
+  String::Value input(args[0]);
+  Local<Object> handler = args[1]->ToObject();
 
   /* Initialize parser. */
   yaml_parser_t parser;
@@ -83,47 +72,111 @@ Load(const Arguments &args)
     return ThrowException(Exception::Error(String::New("YAML parser initialization failed.")));
   /* FIXME: Detect endianness? */
   yaml_parser_set_encoding(&parser, YAML_UTF16LE_ENCODING);
-  String::Value input(args[0]);
   yaml_parser_set_input_string(&parser,
       (const unsigned char *)*input, input.length() * sizeof(uint16_t));
 
-  /* Iterate documents. */
-  int success;
-  yaml_document_t document;
-  for (uint32_t i = 0; (success = yaml_parser_load(&parser, &document)); i++) {
-    yaml_node_t *root = yaml_document_get_root_node(&document);
-    if (root)
-      documents->Set(i, ValueFromNode(&document, root));
-    yaml_document_delete(&document);
-    if (!root)
+  /* Event loop. */
+  yaml_event_t event;
+  Local<String> method_name;
+  Local<Value> method;
+  Local<Object> event_obj, tmp;
+  Local<Value> params[1];
+  while (yaml_parser_parse(&parser, &event)) {
+    /* Find the right handler method. */
+    switch (event.type) {
+      case YAML_STREAM_START_EVENT:   method_name = *on_stream_start_symbol;   break;
+      case YAML_STREAM_END_EVENT:     method_name = *on_stream_end_symbol;     break;
+      case YAML_DOCUMENT_START_EVENT: method_name = *on_document_start_symbol; break;
+      case YAML_DOCUMENT_END_EVENT:   method_name = *on_document_end_symbol;   break;
+      case YAML_ALIAS_EVENT:          method_name = *on_alias_symbol;          break;
+      case YAML_SCALAR_EVENT:         method_name = *on_scalar_symbol;         break;
+      case YAML_SEQUENCE_START_EVENT: method_name = *on_sequence_start_symbol; break;
+      case YAML_SEQUENCE_END_EVENT:   method_name = *on_sequence_end_symbol;   break;
+      case YAML_MAPPING_START_EVENT:  method_name = *on_mapping_start_symbol;  break;
+      case YAML_MAPPING_END_EVENT:    method_name = *on_mapping_end_symbol;    break;
+      default: goto loop_end;
+    }
+    method = handler->Get(method_name);
+    if (!method->IsFunction())
+      goto loop_end;
+
+    /* Create the event object. */
+    event_obj = Object::New();
+    event_obj->Set(start_symbol, yaml_node_object_from_mark(event.start_mark));
+    event_obj->Set(end_symbol,   yaml_node_object_from_mark(event.end_mark));
+    switch (event.type) {
+      case YAML_DOCUMENT_START_EVENT:
+        if (event.data.document_start.version_directive) {
+          tmp = Object::New();
+          tmp->Set(major_symbol, Integer::New(event.data.document_start.version_directive->major));
+          tmp->Set(minor_symbol, Integer::New(event.data.document_start.version_directive->minor));
+          event_obj->Set(version_symbol, tmp);
+        }
+        else
+          event_obj->Set(version_symbol, Null());
+        event_obj->Set(implict_symbol, event.data.document_start.implicit ? True() : False());
+        break;
+      /*
+      case YAML_DOCUMENT_END_EVENT:
+      case YAML_ALIAS_EVENT:
+      case YAML_SCALAR_EVENT:
+      case YAML_SEQUENCE_START_EVENT:
+      case YAML_SEQUENCE_END_EVENT:
+      case YAML_MAPPING_START_EVENT:
+      case YAML_MAPPING_END_EVENT:
+      */
+      default: break;
+    }
+
+    /* Call the handler method. */
+    params[0] = event_obj;
+    Handle<Function>::Cast(method)->Call(handler, 1, params);
+
+  loop_end:
+    /* Clean up the event. */
+    if (event.type == YAML_STREAM_END_EVENT) {
+      yaml_event_delete(&event);
       break;
+    }
+    else
+      yaml_event_delete(&event);
   }
-  /* Success should be 1 if we break'd as we were supposed to. */
-  /* FIXME: More descriptive error message. */
-  if (!success)
-    return ThrowException(Exception::Error(String::New("YAML parser had an error.")));
 
   /* Clean up the parser. */
   yaml_parser_delete(&parser);
 
-  return scope.Close(documents);
-}
-
-
-static void
-Initialize(Handle<Object> target)
-{
-  HandleScope scope;
-  Local<FunctionTemplate> load_template = FunctionTemplate::New(Load);
-  target->Set(String::NewSymbol("load"), load_template->GetFunction());
-}
-
-
+  return Undefined();
 }
 
 
 extern "C" void
 init(Handle<Object> target)
 {
-  yaml::Initialize(target);
+  HandleScope scope;
+
+  on_stream_start_symbol   = NODE_PSYMBOL("onStreamStart");
+  on_stream_end_symbol     = NODE_PSYMBOL("onStreamEnd");
+  on_document_start_symbol = NODE_PSYMBOL("onDocumentStart");
+  on_document_end_symbol   = NODE_PSYMBOL("onDocumentEnd");
+  on_alias_symbol          = NODE_PSYMBOL("onAlias");
+  on_scalar_symbol         = NODE_PSYMBOL("onScalar");
+  on_sequence_start_symbol = NODE_PSYMBOL("onSequenceStart");
+  on_sequence_end_symbol   = NODE_PSYMBOL("onSequenceEnd");
+  on_mapping_start_symbol  = NODE_PSYMBOL("onMappingStart");
+  on_mapping_end_symbol    = NODE_PSYMBOL("onMappingEnd");
+
+  start_symbol = NODE_PSYMBOL("start");
+  end_symbol   = NODE_PSYMBOL("end");
+
+  index_symbol  = NODE_PSYMBOL("index");
+  line_symbol   = NODE_PSYMBOL("line");
+  column_symbol = NODE_PSYMBOL("column");
+
+  major_symbol   = NODE_PSYMBOL("major");
+  minor_symbol   = NODE_PSYMBOL("minor");
+  version_symbol = NODE_PSYMBOL("version");
+  implict_symbol = NODE_PSYMBOL("implicit");
+
+  Local<FunctionTemplate> parse_template = FunctionTemplate::New(yaml_node_parse);
+  target->Set(String::NewSymbol("parse"), parse_template->GetFunction());
 }
