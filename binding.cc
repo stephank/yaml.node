@@ -56,7 +56,7 @@ static Persistent<String> block_symbol;
 static Persistent<String> flow_symbol;
 
 
-// Convert from libyaml's booleans.
+// Convert from LibYAML's booleans.
 static inline Handle<Boolean>
 FromBoolean(int value)
 {
@@ -64,7 +64,7 @@ FromBoolean(int value)
 }
 
 
-// Convert from libyaml's strings.
+// Convert from LibYAML's strings.
 static inline Handle<Value>
 FromString(yaml_char_t *value)
 {
@@ -78,7 +78,7 @@ FromString(yaml_char_t *value, size_t length)
 }
 
 
-// Create an object from libyaml's mark.
+// Create an object from LibYAML's mark.
 static inline Local<Object>
 FromMark(yaml_mark_t &mark)
 {
@@ -96,7 +96,7 @@ Parse(const Arguments &args)
 {
   HandleScope scope;
 
-  // Check arguments
+  // Check arguments.
   if (args.Length() != 2)
     return ThrowException(Exception::Error(String::New("Two arguments were expected.")));
   if (!args[0]->IsString()) 
