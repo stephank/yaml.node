@@ -10,6 +10,8 @@
 using namespace v8;
 using namespace node;
 
+namespace yaml {
+
 
 static Persistent<String> on_stream_start_symbol;
 static Persistent<String> on_stream_end_symbol;
@@ -36,22 +38,35 @@ static Persistent<String> implicit_symbol;
 static Persistent<String> anchor_symbol;
 
 
-/* Create an object like libyaml's mark. */
-static Local<Object>
-yaml_node_object_from_mark(yaml_mark_t &mark)
+static inline Handle<Boolean>
+FromBoolean(int value)
 {
-  HandleScope scope;
+  return value ? True() : False();
+}
+
+
+static inline Handle<Value>
+FromString(yaml_char_t *value)
+{
+  return value ? String::New((const char *)value) : Null();
+}
+
+
+/* Create an object from libyaml's mark. */
+static inline Local<Object>
+FromMark(yaml_mark_t &mark)
+{
   Local<Object> obj = Object::New();
   obj->Set(index_symbol,  Integer::NewFromUnsigned(mark.index));
   obj->Set(line_symbol,   Integer::NewFromUnsigned(mark.line));
   obj->Set(column_symbol, Integer::NewFromUnsigned(mark.column));
-  return scope.Close(obj);
+  return obj;
 }
 
 
 /* The workhorse. */
 static Handle<Value>
-yaml_node_parse(const Arguments &args)
+Parse(const Arguments &args)
 {
   HandleScope scope;
 
@@ -80,7 +95,7 @@ yaml_node_parse(const Arguments &args)
   yaml_event_t event;
   Local<String> method_name;
   Local<Value> method;
-  Local<Object> event_obj, tmp;
+  Local<Object> obj, tmp;
   Local<Value> params[1];
   while (yaml_parser_parse(&parser, &event)) {
     /* Find the right handler method. */
@@ -102,9 +117,9 @@ yaml_node_parse(const Arguments &args)
       goto loop_end;
 
     /* Create the event object. */
-    event_obj = Object::New();
-    event_obj->Set(start_symbol, yaml_node_object_from_mark(event.start_mark));
-    event_obj->Set(end_symbol,   yaml_node_object_from_mark(event.end_mark));
+    obj = Object::New();
+    obj->Set(start_symbol, FromMark(event.start_mark));
+    obj->Set(end_symbol,   FromMark(event.end_mark));
 
     switch (event.type) {
       case YAML_DOCUMENT_START_EVENT:
@@ -112,25 +127,23 @@ yaml_node_parse(const Arguments &args)
           tmp = Object::New();
           tmp->Set(major_symbol, Integer::New(event.data.document_start.version_directive->major));
           tmp->Set(minor_symbol, Integer::New(event.data.document_start.version_directive->minor));
-          event_obj->Set(version_symbol, tmp);
+          obj->Set(version_symbol, tmp);
         }
         else
-          event_obj->Set(version_symbol, Null());
-        event_obj->Set(implicit_symbol, event.data.document_start.implicit ? True() : False());
+          obj->Set(version_symbol, Null());
+        obj->Set(implicit_symbol, FromBoolean(event.data.document_start.implicit));
         break;
 
       case YAML_DOCUMENT_END_EVENT:
-        event_obj->Set(implicit_symbol, event.data.document_end.implicit ? True() : False());
+        obj->Set(implicit_symbol, FromBoolean(event.data.document_end.implicit));
         break;
 
       case YAML_ALIAS_EVENT:
-        event_obj->Set(anchor_symbol,
-            event.data.alias.anchor ? String::New((const char *)event.data.alias.anchor) : Null());
+        obj->Set(anchor_symbol, FromString(event.data.alias.anchor));
         break;
 
       case YAML_SCALAR_EVENT:
-        event_obj->Set(anchor_symbol,
-            event.data.scalar.anchor ? String::New((const char *)event.data.scalar.anchor) : Null());
+        obj->Set(anchor_symbol, FromString(event.data.scalar.anchor));
         break;
 
       case YAML_SEQUENCE_START_EVENT:
@@ -150,7 +163,7 @@ yaml_node_parse(const Arguments &args)
     }
 
     /* Call the handler method. */
-    params[0] = event_obj;
+    params[0] = obj;
     Handle<Function>::Cast(method)->Call(handler, 1, params);
 
   loop_end:
@@ -170,8 +183,8 @@ yaml_node_parse(const Arguments &args)
 }
 
 
-extern "C" void
-init(Handle<Object> target)
+static void
+Initialize(Handle<Object> target)
 {
   HandleScope scope;
 
@@ -199,6 +212,16 @@ init(Handle<Object> target)
   implicit_symbol = NODE_PSYMBOL("implicit");
   anchor_symbol   = NODE_PSYMBOL("anchor");
 
-  Local<FunctionTemplate> parse_template = FunctionTemplate::New(yaml_node_parse);
+  Local<FunctionTemplate> parse_template = FunctionTemplate::New(Parse);
   target->Set(String::NewSymbol("parse"), parse_template->GetFunction());
+}
+
+
+} // namespace yaml
+
+
+extern "C" void
+init(Handle<Object> target)
+{
+  yaml::Initialize(target);
 }
