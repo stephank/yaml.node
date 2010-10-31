@@ -4,6 +4,24 @@
 var sys = require('sys');
 var binding = exports.capi = require('./binding');
 
+// Helper function that converts a string scalar to its actual type.
+// Borrows heavily from tenderlove's `Psych::ScalarScanner`.
+var parseScalar = function(v) {
+  if (!v) return null;
+  if (/^[A-Za-z~]/.test(v)) {
+    if (v.length > 5 || /^[^ytonf~]/i.test(v)) return v;
+    if (v === '~' || /^null$/i.test(v)) return null;
+    if (/^(yes|true|on)$/i.test(v)) return true;
+    if (/^(no|false|off)$/i.test(v)) return false;
+    return v;
+  }
+  if ( /^\.inf$/i.test(v)) return  1/0;
+  if (/^-\.inf$/i.test(v)) return -1/0;
+  if ( /^\.nan$/i.test(v)) return 0/0;
+  // FIXME: Time, integer, and float parsing
+  return v;
+};
+
 // `parse` is the binding to LibYAML's parser. It's signature is:
 //
 //     function(input, handler) { [native] }
@@ -46,7 +64,7 @@ exports.load = function(input) {
     },
 
     onScalar: function(e) {
-      newValue(e.value);
+      newValue(parseScalar(e.value));
     },
 
     onSequenceStart: function(e) {

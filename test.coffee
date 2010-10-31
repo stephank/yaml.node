@@ -7,12 +7,14 @@ YAML = require './yaml'
 test = '''
     ---
     item:
-      seq: [1,2,3]
-      float: 5.4
+      seq: [1,2,3,-9]
+      float: 5.4e3
+      moreNumbers: [-3.5,+7,+inf,NaN]
       string: this is some text
     other:
       # Comment
-      boolean: true
+      booleans: [true, fALse, YES, no, On, oFF]
+      nothing: ~
 
     ---
     - New document
