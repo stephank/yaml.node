@@ -32,7 +32,8 @@ static Persistent<String> column_symbol;
 static Persistent<String> major_symbol;
 static Persistent<String> minor_symbol;
 static Persistent<String> version_symbol;
-static Persistent<String> implict_symbol;
+static Persistent<String> implicit_symbol;
+static Persistent<String> anchor_symbol;
 
 
 /* Create an object like libyaml's mark. */
@@ -104,6 +105,7 @@ yaml_node_parse(const Arguments &args)
     event_obj = Object::New();
     event_obj->Set(start_symbol, yaml_node_object_from_mark(event.start_mark));
     event_obj->Set(end_symbol,   yaml_node_object_from_mark(event.end_mark));
+
     switch (event.type) {
       case YAML_DOCUMENT_START_EVENT:
         if (event.data.document_start.version_directive) {
@@ -114,18 +116,37 @@ yaml_node_parse(const Arguments &args)
         }
         else
           event_obj->Set(version_symbol, Null());
-        event_obj->Set(implict_symbol, event.data.document_start.implicit ? True() : False());
+        event_obj->Set(implicit_symbol, event.data.document_start.implicit ? True() : False());
         break;
-      /*
+
       case YAML_DOCUMENT_END_EVENT:
+        event_obj->Set(implicit_symbol, event.data.document_end.implicit ? True() : False());
+        break;
+
       case YAML_ALIAS_EVENT:
+        event_obj->Set(anchor_symbol,
+            event.data.alias.anchor ? String::New((const char *)event.data.alias.anchor) : Null());
+        break;
+
       case YAML_SCALAR_EVENT:
+        event_obj->Set(anchor_symbol,
+            event.data.scalar.anchor ? String::New((const char *)event.data.scalar.anchor) : Null());
+        break;
+
       case YAML_SEQUENCE_START_EVENT:
+        break;
+
       case YAML_SEQUENCE_END_EVENT:
+        break;
+
       case YAML_MAPPING_START_EVENT:
+        break;
+
       case YAML_MAPPING_END_EVENT:
-      */
-      default: break;
+        break;
+
+      default:
+        break;
     }
 
     /* Call the handler method. */
@@ -172,10 +193,11 @@ init(Handle<Object> target)
   line_symbol   = NODE_PSYMBOL("line");
   column_symbol = NODE_PSYMBOL("column");
 
-  major_symbol   = NODE_PSYMBOL("major");
-  minor_symbol   = NODE_PSYMBOL("minor");
-  version_symbol = NODE_PSYMBOL("version");
-  implict_symbol = NODE_PSYMBOL("implicit");
+  major_symbol    = NODE_PSYMBOL("major");
+  minor_symbol    = NODE_PSYMBOL("minor");
+  version_symbol  = NODE_PSYMBOL("version");
+  implicit_symbol = NODE_PSYMBOL("implicit");
+  anchor_symbol   = NODE_PSYMBOL("anchor");
 
   Local<FunctionTemplate> parse_template = FunctionTemplate::New(yaml_node_parse);
   target->Set(String::NewSymbol("parse"), parse_template->GetFunction());
