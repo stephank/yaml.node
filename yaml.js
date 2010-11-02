@@ -4,21 +4,44 @@
 var sys = require('sys');
 var binding = exports.capi = require('./binding');
 
+// Most of these were derived from: http://yaml.org/type/
+// Also borrows from tenderlove's `Psych::ScalarScanner`. (MIT-licensed)
+var definitelyNonNumericRe = /^[a-z~]/i,
+    definitelyNonBooleanRe = /^[^ytonf~]/i,
+    canParseIntRe   = /^[-+]?(0x[0-9a-fA-F_]+|[\d_]+)$/,
+    canParseFloatRe = /^[-+]?(\d[\d_]*)?\.[\d_]*(e[-+]\d+)?$/i,
+    nullRe   = /^(~|null)$/i,
+    trueRe   = /^(y|yes|true|on)$/i,
+    falseRe  = /^(n|no|false|off)$/i,
+    posInfRe = /^\+?\.inf$/i,
+    negInfRe = /^-\.inf$/i,
+    nanRe    = /^\.nan$/i,
+    binRe    = /^[-+]?0b[01_]+$/,
+    dateRe      = /^\d{4}-\d\d?-\d\d?$/,
+    timestampRe = /^\d{4}-\d\d?-\d\d?([Tt]|\s+)\d\d?:\d\d:\d\d(\.\d*)?(\s*(Z|[-+]\d\d?(:\d\d)?))?$/,
+    timeIntRe   = /^[-+]?[1-9][\d_]*(:[0-5]?\d)+$/,
+    timeFloatRe = /^[-+]?[0-9][\d_]*(:[0-5]?\d)+\.[\d_]*$/;
+    underscoresRe = /_/g;
+
 // Helper function that converts a string scalar to its actual type.
-// Borrows heavily from tenderlove's `Psych::ScalarScanner`.
 var parseScalar = function(v) {
   if (!v) return null;
-  if (/^[A-Za-z~]/.test(v)) {
-    if (v.length > 5 || /^[^ytonf~]/i.test(v)) return v;
-    if (v === '~' || /^null$/i.test(v)) return null;
-    if (/^(yes|true|on)$/i.test(v)) return true;
-    if (/^(no|false|off)$/i.test(v)) return false;
+  if (definitelyNonNumericRe.test(v)) {
+    if (v.length > 5 || definitelyNonBooleanRe.test(v)) return v;
+    if (nullRe.test(v)) return null;
+    if (trueRe.test(v)) return true;
+    if (falseRe.test(v)) return false;
     return v;
   }
-  if ( /^\.inf$/i.test(v)) return  1/0;
-  if (/^-\.inf$/i.test(v)) return -1/0;
-  if ( /^\.nan$/i.test(v)) return 0/0;
-  // FIXME: Time, integer, and float parsing
+  if (posInfRe.test(v)) return  1/0;
+  if (negInfRe.test(v)) return -1/0;
+  if (nanRe.test(v))    return  0/0;
+  // FIXME: Stamps without a timezone are treated as local, not UTC.
+  if (timestampRe.test(v)) return new Date(v.replace('t', 'T'));
+  if (dateRe.test(v))      return new Date(v + "T00:00:00Z");
+  if (canParseIntRe.test(v))   return parseInt(  v.replace(underscoresRe, ''));
+  if (canParseFloatRe.test(v)) return parseFloat(v.replace(underscoresRe, ''));
+  // FIXME: Parse times and binary numbers.
   return v;
 };
 
