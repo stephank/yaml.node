@@ -1,27 +1,26 @@
 import Options
-from os import unlink, link
+from os import unlink, symlink
 from os.path import exists
-
-APPNAME = 'yaml.node'
-VERSION = "0.0.1"
+from logging import fatal
 
 def set_options(opt):
-    opt.tool_options("compiler_cxx")
+  opt.tool_options("compiler_cxx")
 
 def configure(conf):
-    conf.check_tool("compiler_cxx")
-    conf.check_tool("node_addon")
+  conf.check_tool("compiler_cxx")
+  conf.check_tool("node_addon")
+  if not conf.check(lib='yaml'):
+    fatal("LibYAML not found.")
 
 def build(bld):
-    obj = bld.new_task_gen("cxx", "shlib", "node_addon")
-    obj.cxxflags = ["-Wall", "-Werror"]
-    obj.target = "binding"
-    obj.source = "binding.cc"
-    obj.lib = ["yaml"]
+  obj = bld.new_task_gen("cxx", "shlib", "node_addon")
+  obj.cxxflags = ["-Wall", "-Werror"]
+  obj.target = "binding"
+  obj.source = "binding.cc"
+  obj.lib = ["yaml"]
 
 def shutdown():
-  # HACK to get binding.node out of build directory.
-  # better way to do this?
-  if exists('./binding.node'): unlink('./binding.node')
+  if exists('./binding.node'):
+    unlink('./binding.node')
   if Options.commands['build']:
-    link('./build/default/binding.node', './binding.node')
+    symlink('./build/default/binding.node', './binding.node')
