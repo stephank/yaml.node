@@ -18,7 +18,7 @@ var definitelyNonNumericRe = /^[a-z~]/i,
     nanRe    = /^\.nan$/i,
     binRe    = /^[-+]?0b[01_]+$/,
     dateRe      = /^\d{4}-\d\d?-\d\d?$/,
-    timestampRe = /^\d{4}-\d\d?-\d\d?([Tt]|\s+)\d\d?:\d\d:\d\d(\.\d*)?(\s*(Z|[-+]\d\d?(:\d\d)?))?$/,
+    timestampRe = /^(\d{4}-\d\d?-\d\d?(?:[Tt]|\s+)\d\d?:\d\d:\d\d(?:\.\d*)?)(?:\s*(Z|[-+]\d\d?(?::\d\d)?))?$/,
     timeIntRe   = /^[-+]?[1-9][\d_]*(:[0-5]?\d)+$/,
     timeFloatRe = /^[-+]?[0-9][\d_]*(:[0-5]?\d)+\.[\d_]*$/;
     underscoresRe = /_/g;
@@ -26,6 +26,7 @@ var definitelyNonNumericRe = /^[a-z~]/i,
 // Helper function that converts a string scalar to its actual type.
 var parseScalar = function(v) {
   if (!v) return null;
+
   if (definitelyNonNumericRe.test(v)) {
     if (v.length > 5 || definitelyNonBooleanRe.test(v)) return v;
     if (nullRe.test(v)) return null;
@@ -33,12 +34,28 @@ var parseScalar = function(v) {
     if (falseRe.test(v)) return false;
     return v;
   }
+
   if (posInfRe.test(v)) return  1/0;
   if (negInfRe.test(v)) return -1/0;
   if (nanRe.test(v))    return  0/0;
-  // FIXME: Stamps without a timezone are treated as local, not UTC.
-  if (timestampRe.test(v)) return new Date(v.replace('t', 'T'));
-  if (dateRe.test(v))      return new Date(v + "T00:00:00Z");
+
+  // JavaScript's datetime parsing is subtly different from YAML's.
+  var m = timestampRe.exec(v);
+  if (m) {
+    var offset = 0, dateTimePart = m[1].replace('t', 'T');
+    if (m[2] && m[2] !== 'Z') {
+      var parts = m[2].split(':');
+      offset = parseInt(parts[0]) * 100;
+      if (parts.length == 2)
+        offset += parseInt(parts[1]);
+    }
+    if (offset >= 0)
+      offset = "+" + offset;
+    return new Date(dateTimePart + offset);
+  }
+  if (dateRe.test(v))
+    return new Date(v + "T00:00:00Z");
+
   if (canParseIntRe.test(v))   return parseInt(  v.replace(underscoresRe, ''));
   if (canParseFloatRe.test(v)) return parseFloat(v.replace(underscoresRe, ''));
   // FIXME: Parse times and binary numbers.
