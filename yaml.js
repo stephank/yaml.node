@@ -16,7 +16,7 @@ var definitelyNonNumericRe = /^[a-z~]/i,
     posInfRe = /^\+?\.inf$/i,
     negInfRe = /^-\.inf$/i,
     nanRe    = /^\.nan$/i,
-    binRe    = /^[-+]?0b[01_]+$/,
+    binRe    = /^([-+])?0b([01_]+)$/,
     timeRe   = /^([-+]?)([0-9][\d_]*(?::[0-5]?\d)+(?:\.[\d_]*)?)$/,
     dateRe   = /^\d{4}-\d\d?-\d\d?$/,
     timestampRe = /^(\d{4}-\d\d?-\d\d?(?:[Tt]|\s+)\d\d?:\d\d:\d\d(?:\.\d*)?)(?:\s*(Z|[-+]\d\d?(?::\d\d)?))?$/,
@@ -26,6 +26,7 @@ var definitelyNonNumericRe = /^[a-z~]/i,
 var parseScalar = function(v) {
   if (!v) return null;
 
+  // Simple keywords.
   if (definitelyNonNumericRe.test(v)) {
     if (v.length > 5 || definitelyNonBooleanRe.test(v)) return v;
     if (nullRe.test(v)) return null;
@@ -33,10 +34,25 @@ var parseScalar = function(v) {
     if (falseRe.test(v)) return false;
     return v;
   }
-
   if (posInfRe.test(v)) return  1/0;
   if (negInfRe.test(v)) return -1/0;
   if (nanRe.test(v))    return  0/0;
+
+  // JavaScript's `parseInt` does not support binary numbers.
+  var m = binRe.exec(v);
+  if (m) {
+    var s = m[2], length = s.length; result = 0, i;
+    for (i = 0; i < length; i++) {
+      if (s[i] == '_')
+        continue;
+      result *= 2;
+      if (s[i] == '1')
+        result++;
+    }
+    if (m[1] == '-')
+      result *= -1;
+    return result;
+  }
 
   // JavaScript's datetime parsing is subtly different from YAML's.
   var m = timestampRe.exec(v);
@@ -55,10 +71,12 @@ var parseScalar = function(v) {
   if (dateRe.test(v))
     return new Date(v + "T00:00:00Z");
 
+  // Regular numbers.
   if (canParseIntRe.test(v))   return parseInt(  v.replace(underscoresRe, ''));
   if (canParseFloatRe.test(v)) return parseFloat(v.replace(underscoresRe, ''));
 
-  m = timeRe.exec(v);
+  // Times.
+  var m = timeRe.exec(v);
   if (m) {
     var parts = m[2].split(':'), length = parts.length, result = 0, i;
     for (i = 0; i < parts.length; i++) {
@@ -73,7 +91,6 @@ var parseScalar = function(v) {
     return result;
   }
 
-  // FIXME: Parse binary numbers.
   return v;
 };
 
