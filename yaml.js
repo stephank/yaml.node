@@ -17,10 +17,9 @@ var definitelyNonNumericRe = /^[a-z~]/i,
     negInfRe = /^-\.inf$/i,
     nanRe    = /^\.nan$/i,
     binRe    = /^[-+]?0b[01_]+$/,
-    dateRe      = /^\d{4}-\d\d?-\d\d?$/,
+    timeRe   = /^([-+]?)([0-9][\d_]*(?::[0-5]?\d)+(?:\.[\d_]*)?)$/,
+    dateRe   = /^\d{4}-\d\d?-\d\d?$/,
     timestampRe = /^(\d{4}-\d\d?-\d\d?(?:[Tt]|\s+)\d\d?:\d\d:\d\d(?:\.\d*)?)(?:\s*(Z|[-+]\d\d?(?::\d\d)?))?$/,
-    timeIntRe   = /^[-+]?[1-9][\d_]*(:[0-5]?\d)+$/,
-    timeFloatRe = /^[-+]?[0-9][\d_]*(:[0-5]?\d)+\.[\d_]*$/;
     underscoresRe = /_/g;
 
 // Helper function that converts a string scalar to its actual type.
@@ -58,7 +57,23 @@ var parseScalar = function(v) {
 
   if (canParseIntRe.test(v))   return parseInt(  v.replace(underscoresRe, ''));
   if (canParseFloatRe.test(v)) return parseFloat(v.replace(underscoresRe, ''));
-  // FIXME: Parse times and binary numbers.
+
+  m = timeRe.exec(v);
+  if (m) {
+    var parts = m[2].split(':'), length = parts.length, result = 0, i;
+    for (i = 0; i < parts.length; i++) {
+      result *= 60;
+      if (i + 1 == parts.length)
+        result += parseFloat(parts[i]);
+      else
+        result += parseInt(parts[i]);
+    }
+    if (m[1] == '-')
+      result *= -1;
+    return result;
+  }
+
+  // FIXME: Parse binary numbers.
   return v;
 };
 
