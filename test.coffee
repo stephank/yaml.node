@@ -73,7 +73,11 @@ test = '''
       - Null
   '''
 
+console.log "===== Parser"
 for document, i in YAML.load(test)
-  console.log "Document ##{i+1}"
+  console.log "----- Document ##{i+1}"
   console.log document
   console.log ''
+
+console.log "===== Emitter"
+console.log YAML.dump('Hello world!', 'Hello document #2!')

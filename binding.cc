@@ -306,12 +306,17 @@ private:
     Local<Function> block = Local<Function>::Cast(args[0]);
 
     Emitter *e = GetEmitter(args);
+    yaml_event_t *ev;
 
-    // FIXME: stream-start event
+    ev = new yaml_event_t;
+    yaml_stream_start_event_initialize(ev, YAML_ANY_ENCODING);
+    yaml_emitter_emit(&e->emitter_, ev);
 
     block->Call(Context::GetCurrent()->Global(), 0, NULL);
 
-    // FIXME: stream-stop event
+    ev = new yaml_event_t;
+    yaml_stream_end_event_initialize(ev);
+    yaml_emitter_emit(&e->emitter_, ev);
 
     return Undefined();
   }
@@ -319,6 +324,7 @@ private:
   static Handle<Value>
   Document(const Arguments &args)
   {
+    // FIXME: Event options.
     if (args.Length() != 1)
         return ThrowException(Exception::TypeError(
             String::New("Expected one argument")));
@@ -328,12 +334,17 @@ private:
     Local<Function> block = Local<Function>::Cast(args[0]);
 
     Emitter *e = GetEmitter(args);
+    yaml_event_t *ev;
 
-    // FIXME: document-start event
+    ev = new yaml_event_t;
+    yaml_document_start_event_initialize(ev, NULL, NULL, NULL, 0);
+    yaml_emitter_emit(&e->emitter_, ev);
 
     block->Call(Context::GetCurrent()->Global(), 0, NULL);
 
-    // FIXME: document-stop event
+    ev = new yaml_event_t;
+    yaml_document_end_event_initialize(ev, 0);
+    yaml_emitter_emit(&e->emitter_, ev);
 
     return Undefined();
   }
@@ -349,13 +360,13 @@ private:
             String::New("Expected a function")));
     Local<Function> block = Local<Function>::Cast(args[0]);
 
-    Emitter *e = GetEmitter(args);
+    //Emitter *e = GetEmitter(args);
 
     // FIXME: sequence-start event
 
     block->Call(Context::GetCurrent()->Global(), 0, NULL);
 
-    // FIXME: sequence-stop event
+    // FIXME: sequence-end event
 
     return Undefined();
   }
@@ -371,13 +382,13 @@ private:
             String::New("Expected a function")));
     Local<Function> block = Local<Function>::Cast(args[0]);
 
-    Emitter *e = GetEmitter(args);
+    //Emitter *e = GetEmitter(args);
 
     // FIXME: mapping-start event
 
     block->Call(Context::GetCurrent()->Global(), 0, NULL);
 
-    // FIXME: mapping-stop event
+    // FIXME: mapping-end event
 
     return Undefined();
   }
@@ -385,7 +396,7 @@ private:
   static Handle<Value>
   Alias(const Arguments &args)
   {
-    Emitter *e = GetEmitter(args);
+    //Emitter *e = GetEmitter(args);
 
     // FIXME: alias event
 
@@ -395,9 +406,22 @@ private:
   static Handle<Value>
   Scalar(const Arguments &args)
   {
+    // FIXME: Event options.
+    if (args.Length() != 1)
+        return ThrowException(Exception::TypeError(
+            String::New("Expected one argument")));
+    if (!args[0]->IsString())
+        return ThrowException(Exception::TypeError(
+            String::New("Expected a string")));
+    String::Utf8Value value(args[0]->ToString());
+
     Emitter *e = GetEmitter(args);
 
-    // FIXME: scalar event
+    yaml_event_t *ev = new yaml_event_t;
+    yaml_scalar_event_initialize(ev, NULL, NULL,
+        (yaml_char_t *)*value, value.length(),
+        1, 1, YAML_ANY_SCALAR_STYLE);
+    yaml_emitter_emit(&e->emitter_, ev);
 
     return Undefined();
   }
@@ -409,7 +433,8 @@ private:
     HandleScope scope;
 
     TryCatch try_catch;
-    e->chunks_->Set(e->chunks_pos_++, String::New((const uint16_t *)buffer, size));
+    e->chunks_->Set(e->chunks_pos_++, String::New(
+        (const uint16_t *)buffer, size / sizeof(uint16_t)));
     if (try_catch.HasCaught()) {
       FatalException(try_catch);
       return 0;

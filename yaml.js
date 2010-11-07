@@ -171,3 +171,19 @@ exports.load = function(input) {
 
   return documents;
 };
+
+exports.dump = function() {
+  var emitter = new binding.Emitter(),
+      documents = arguments;
+  emitter.stream(function() {
+    var length = documents.length;
+    for (var i = 0; i < length; i++) {
+      var document = documents[i];
+      emitter.document(function() {
+        // FIXME: Iterate whatever's in there.
+        emitter.scalar(document);
+      });
+    }
+  });
+  return emitter.chunks.join('');
+};
