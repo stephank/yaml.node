@@ -80,4 +80,9 @@ for document, i in YAML.load(test)
   console.log ''
 
 console.log "===== Emitter"
-console.log YAML.dump('Hello world!', 'Hello document #2!')
+console.log YAML.dump(
+  'Hello world!',
+  null,
+  ['Hello array document!', 'element!', 'moar'],
+  { hello: 'world' }
+)

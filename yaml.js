@@ -172,6 +172,41 @@ exports.load = function(input) {
   return documents;
 };
 
+var serialize = function(emitter, item) {
+  // FIXME: throw on circulars
+  switch (typeof item) {
+    case "string":
+      emitter.scalar(item);
+      break;
+    case "object":
+      if (!item) {
+        emitter.scalar('~');
+      }
+      else if (item.length) {
+        emitter.sequence(function() {
+          var length = item.length;
+          for (var i = 0; i < length; i++)
+            serialize(emitter, item[i]);
+        });
+      }
+      else {
+        emitter.mapping(function() {
+          for (var p in item) {
+            if (Object.hasOwnProperty.call(item, p)) {
+              emitter.scalar(p);
+              serialize(emitter, item[p]);
+            }
+          }
+        });
+      }
+      break;
+    default:
+      // FIXME: Properly serialize some special scalars (inf, datetimes, etc.)
+      emitter.scalar(String(item));
+      break;
+  }
+};
+
 exports.dump = function() {
   var emitter = new binding.Emitter(),
       documents = arguments;
@@ -180,8 +215,7 @@ exports.dump = function() {
     for (var i = 0; i < length; i++) {
       var document = documents[i];
       emitter.document(function() {
-        // FIXME: Iterate whatever's in there.
-        emitter.scalar(document);
+        serialize(emitter, document);
       });
     }
   });

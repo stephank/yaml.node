@@ -352,6 +352,7 @@ private:
   static Handle<Value>
   Sequence(const Arguments &args)
   {
+    // FIXME: Event options.
     if (args.Length() != 1)
         return ThrowException(Exception::TypeError(
             String::New("Expected one argument")));
@@ -360,13 +361,18 @@ private:
             String::New("Expected a function")));
     Local<Function> block = Local<Function>::Cast(args[0]);
 
-    //Emitter *e = GetEmitter(args);
+    Emitter *e = GetEmitter(args);
+    yaml_event_t *ev;
 
-    // FIXME: sequence-start event
+    ev = new yaml_event_t;
+    yaml_sequence_start_event_initialize(ev, NULL, NULL, 0, YAML_ANY_SEQUENCE_STYLE);
+    yaml_emitter_emit(&e->emitter_, ev);
 
     block->Call(Context::GetCurrent()->Global(), 0, NULL);
 
-    // FIXME: sequence-end event
+    ev = new yaml_event_t;
+    yaml_sequence_end_event_initialize(ev);
+    yaml_emitter_emit(&e->emitter_, ev);
 
     return Undefined();
   }
@@ -374,6 +380,7 @@ private:
   static Handle<Value>
   Mapping(const Arguments &args)
   {
+    // FIXME: Event options.
     if (args.Length() != 1)
         return ThrowException(Exception::TypeError(
             String::New("Expected one argument")));
@@ -382,13 +389,18 @@ private:
             String::New("Expected a function")));
     Local<Function> block = Local<Function>::Cast(args[0]);
 
-    //Emitter *e = GetEmitter(args);
+    Emitter *e = GetEmitter(args);
+    yaml_event_t *ev;
 
-    // FIXME: mapping-start event
+    ev = new yaml_event_t;
+    yaml_mapping_start_event_initialize(ev, NULL, NULL, 0, YAML_ANY_MAPPING_STYLE);
+    yaml_emitter_emit(&e->emitter_, ev);
 
     block->Call(Context::GetCurrent()->Global(), 0, NULL);
 
-    // FIXME: mapping-end event
+    ev = new yaml_event_t;
+    yaml_mapping_end_event_initialize(ev);
+    yaml_emitter_emit(&e->emitter_, ev);
 
     return Undefined();
   }
@@ -396,9 +408,19 @@ private:
   static Handle<Value>
   Alias(const Arguments &args)
   {
-    //Emitter *e = GetEmitter(args);
+    if (args.Length() != 1)
+        return ThrowException(Exception::TypeError(
+            String::New("Expected one argument")));
+    if (!args[0]->IsString())
+        return ThrowException(Exception::TypeError(
+            String::New("Expected a string")));
+    String::AsciiValue anchor(args[0]->ToString());
 
-    // FIXME: alias event
+    Emitter *e = GetEmitter(args);
+
+    yaml_event_t *ev = new yaml_event_t;
+    yaml_alias_event_initialize(ev, (yaml_char_t *)*anchor);
+    yaml_emitter_emit(&e->emitter_, ev);
 
     return Undefined();
   }
