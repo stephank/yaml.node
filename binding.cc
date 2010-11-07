@@ -4,6 +4,7 @@
 #include <v8.h>
 #include <node.h>
 #include <yaml.h>
+#include <stdexcept>
 
 using namespace v8;
 using namespace node;
@@ -231,6 +232,206 @@ Parse(const Arguments &args)
 }
 
 
+class Emitter : ObjectWrap
+{
+public:
+  static void
+  Initialize(Handle<Object> target)
+  {
+    Local<FunctionTemplate> t = FunctionTemplate::New(New);
+    t->InstanceTemplate()->SetInternalFieldCount(1);
+    t->InstanceTemplate()->SetAccessor(String::NewSymbol("chunks"), GetChunks, NULL);
+
+    NODE_SET_PROTOTYPE_METHOD(t, "stream", Stream);
+    NODE_SET_PROTOTYPE_METHOD(t, "document", Document);
+    NODE_SET_PROTOTYPE_METHOD(t, "sequence", Sequence);
+    NODE_SET_PROTOTYPE_METHOD(t, "mapping", Mapping);
+    NODE_SET_PROTOTYPE_METHOD(t, "alias", Alias);
+    NODE_SET_PROTOTYPE_METHOD(t, "scalar", Scalar);
+
+    target->Set(String::NewSymbol("Emitter"), t->GetFunction());
+  }
+
+  virtual
+  ~Emitter()
+  {
+    chunks_.Dispose();
+    yaml_emitter_delete(&emitter_);
+  }
+
+private:
+  Emitter()
+  {
+    HandleScope scope;
+
+    if (!yaml_emitter_initialize(&emitter_))
+      throw new std::runtime_error("YAML emitter initialization failed.");
+    // FIXME: Detect endianness?
+    yaml_emitter_set_encoding(&emitter_, YAML_UTF16LE_ENCODING);
+    yaml_emitter_set_output(&emitter_, WriteHandler, this);
+
+    chunks_ = Persistent<Array>::New(Array::New());
+    chunks_pos_ = 0;
+  }
+
+  static Handle<Value>
+  New(const Arguments &args)
+  {
+    Emitter *e;
+    try {
+      e = new Emitter();
+    }
+    catch (const std::exception &exc) {
+      return ThrowException(Exception::Error(String::New(exc.what())));
+    }
+    e->Wrap(args.This());
+    return e->handle_;
+  }
+
+  static inline Emitter *
+  GetEmitter(const Arguments &args)
+  {
+    return ObjectWrap::Unwrap<Emitter>(args.This());
+  }
+
+  static Handle<Value>
+  Stream(const Arguments &args)
+  {
+    if (args.Length() != 1)
+        return ThrowException(Exception::TypeError(
+            String::New("Expected one argument")));
+    if (!args[0]->IsFunction())
+        return ThrowException(Exception::TypeError(
+            String::New("Expected a function")));
+    Local<Function> block = Local<Function>::Cast(args[0]);
+
+    Emitter *e = GetEmitter(args);
+
+    // FIXME: stream-start event
+
+    block->Call(Context::GetCurrent()->Global(), 0, NULL);
+
+    // FIXME: stream-stop event
+
+    return Undefined();
+  }
+
+  static Handle<Value>
+  Document(const Arguments &args)
+  {
+    if (args.Length() != 1)
+        return ThrowException(Exception::TypeError(
+            String::New("Expected one argument")));
+    if (!args[0]->IsFunction())
+        return ThrowException(Exception::TypeError(
+            String::New("Expected a function")));
+    Local<Function> block = Local<Function>::Cast(args[0]);
+
+    Emitter *e = GetEmitter(args);
+
+    // FIXME: document-start event
+
+    block->Call(Context::GetCurrent()->Global(), 0, NULL);
+
+    // FIXME: document-stop event
+
+    return Undefined();
+  }
+
+  static Handle<Value>
+  Sequence(const Arguments &args)
+  {
+    if (args.Length() != 1)
+        return ThrowException(Exception::TypeError(
+            String::New("Expected one argument")));
+    if (!args[0]->IsFunction())
+        return ThrowException(Exception::TypeError(
+            String::New("Expected a function")));
+    Local<Function> block = Local<Function>::Cast(args[0]);
+
+    Emitter *e = GetEmitter(args);
+
+    // FIXME: sequence-start event
+
+    block->Call(Context::GetCurrent()->Global(), 0, NULL);
+
+    // FIXME: sequence-stop event
+
+    return Undefined();
+  }
+
+  static Handle<Value>
+  Mapping(const Arguments &args)
+  {
+    if (args.Length() != 1)
+        return ThrowException(Exception::TypeError(
+            String::New("Expected one argument")));
+    if (!args[0]->IsFunction())
+        return ThrowException(Exception::TypeError(
+            String::New("Expected a function")));
+    Local<Function> block = Local<Function>::Cast(args[0]);
+
+    Emitter *e = GetEmitter(args);
+
+    // FIXME: mapping-start event
+
+    block->Call(Context::GetCurrent()->Global(), 0, NULL);
+
+    // FIXME: mapping-stop event
+
+    return Undefined();
+  }
+
+  static Handle<Value>
+  Alias(const Arguments &args)
+  {
+    Emitter *e = GetEmitter(args);
+
+    // FIXME: alias event
+
+    return Undefined();
+  }
+
+  static Handle<Value>
+  Scalar(const Arguments &args)
+  {
+    Emitter *e = GetEmitter(args);
+
+    // FIXME: scalar event
+
+    return Undefined();
+  }
+
+  static int
+  WriteHandler(void *data, unsigned char *buffer, size_t size)
+  {
+    Emitter *e = (Emitter *)data;
+    HandleScope scope;
+
+    TryCatch try_catch;
+    e->chunks_->Set(e->chunks_pos_++, String::New((const uint16_t *)buffer, size));
+    if (try_catch.HasCaught()) {
+      FatalException(try_catch);
+      return 0;
+    }
+
+    return 1;
+  }
+
+  static Handle<Value>
+  GetChunks(Local<String> property, const AccessorInfo &info)
+  {
+    Emitter *e = ObjectWrap::Unwrap<Emitter>(info.Holder());
+    return Local<Array>::New(e->chunks_);
+  }
+
+private:
+  yaml_emitter_t emitter_;
+  Persistent<Array> chunks_;
+  size_t chunks_pos_;
+};
+
+
 // Defines all symbols and module attributes.
 static void
 Initialize(Handle<Object> target)
@@ -277,6 +478,8 @@ Initialize(Handle<Object> target)
 
   Local<FunctionTemplate> parse_template = FunctionTemplate::New(Parse);
   target->Set(String::NewSymbol("parse"), parse_template->GetFunction());
+
+  Emitter::Initialize(target);
 }
 
 
