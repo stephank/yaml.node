@@ -1,8 +1,10 @@
 // YAML.node, © 2010 Stéphan Kochen
 // MIT-licensed. (See the included LICENSE file.)
 
-var sys = require('sys');
-var binding = exports.capi = require('./binding');
+var sys = require('sys'),
+    fs = require('fs'),
+    binding = exports.capi = require('./binding');
+
 
 // Most of these were derived from: http://yaml.org/type/
 // Also borrows from tenderlove's `Psych::ScalarScanner`. (MIT-licensed)
@@ -103,8 +105,8 @@ var parseScalar = function(v) {
 // to a flattened `yaml_event_t`.
 exports.parse = binding.parse;
 
-// The `load` function loads all of a YAML-file's contents into a JavaScript structure. The return
-// value is an array of documents found in the input.
+// The `load` function reads all documents from the given string input. The return value is an
+// array of documents found represented as plain JavaScript objects, arrays and primitives.
 exports.load = function(input) {
   var documents = [],
       document;
@@ -172,6 +174,27 @@ exports.load = function(input) {
   return documents;
 };
 
+// Helper for quickly reading in a file.
+exports.loadFile = function(filename, callback) {
+  fs.readFile(filename, 'utf-8', function(err, data) {
+    if (err) callback(err, null);
+    else callback(null, exports.load(data));
+  });
+};
+
+// Synchronous version of loadFile.
+exports.loadFileSync = function(filename) {
+  var data = fs.readFileSync(filename, 'utf-8');
+  return exports.load(data);
+};
+
+// Allow direct requiring of YAML files.
+require.extensions[".yaml"] = require.extensions[".yml"] = function (module) {
+   module.exports = exports.loadFileSync(module.filename);
+};
+
+
+// Helper function that emits a serialized version of the given item.
 var serialize = function(emitter, item) {
   // FIXME: throw on circulars
   switch (typeof item) {
@@ -207,6 +230,9 @@ var serialize = function(emitter, item) {
   }
 };
 
+// The `dump` function serializes its arguments to YAML. Any number of arguments may be provided,
+// and the arguments should be plain JavaScript objects, arrays or primitives. Each argument is
+// treated as a single document to serialize. The return value is a string.
 exports.dump = function() {
   var emitter = new binding.Emitter(),
       documents = arguments;
