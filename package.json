@@ -1,0 +1,25 @@
+{
+  "name": "libyaml",
+  "version": "0.0.1",
+  "description": "Bindings to libYAML",
+
+  "homepage": "http://github.com/stephank/yaml.node",
+  "repository": {
+    "type": "git",
+    "url": "http://github.com/stephank/yaml.node.git"
+  },
+  "author": {
+    "name": "Stéphan Kochen",
+    "email": "stephan@kochen.nl",
+    "url": "http://stephan.kochen.nl/"
+  },
+
+  "engines": {
+    "node": "0.4"
+  },
+  "scripts": {
+    "install": "node-waf configure build"
+  },
+
+  "main": "./yaml.js"
+}

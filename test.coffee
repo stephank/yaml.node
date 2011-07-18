@@ -2,7 +2,7 @@
 # YAML.node, © 2010 Stéphan Kochen
 # MIT-licensed. (See the included LICENSE file.)
 
-YAML = require './yaml'
+YAML = require './'
 
 test = '''
     ---
