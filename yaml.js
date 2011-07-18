@@ -118,12 +118,12 @@ exports.load = function(input) {
       pushHandler = function(h) {
         stack.unshift(h);
       },
-      popHandler = function()  {
+      popHandler = function() {
         stack.shift();
       };
 
   // Call into the parser and build the documents.
-  // FIXME: Handle tags and anchors. Parse scalars.
+  // FIXME: Handle tags and anchors.
   binding.parse(input, {
     onDocumentStart: function(e) {
       pushHandler(function(v) {
