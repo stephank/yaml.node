@@ -107,67 +107,93 @@ exports.parse = binding.parse;
 
 // The `load` function reads all documents from the given string input. The return value is an
 // array of documents found represented as plain JavaScript objects, arrays and primitives.
-exports.load = function(input) {
-  var documents = [],
-      document;
+exports.load = function(input, tagHandlers) {
+  if (typeof tagHandlers !== 'object')
+    tagHandlers = {};
 
-  // A stack of value handlers, as they occur.
-  // Document, sequence and mapping events add functions to this stack.
-  var stack = [],
-      newValue = function(v) {
-        stack[0](v);
-      },
-      pushHandler = function(h) {
-        stack.unshift(h);
-      },
-      popHandler = function() {
-        stack.shift();
-      };
+  var parserHandler, handlerStack = [];
+
+  // Capture all values between two parser events. Because we can nest in YAML, we need a stack of
+  // these value handlers, and we need to ensure we can deal with `until` blocks that are nested
+  // for the same kinds of events (ie. restore the old event handler afterwards).
+  var until = function(method, valueHandler) {
+    var oldMethod = parserHandler[method];
+    handlerStack.unshift(valueHandler);
+    parserHandler[method] = function(e) {
+      parserHandler[method] = oldMethod;
+      var oldHandler = handlerStack.shift();
+      oldHandler.after();
+    };
+  };
+
+  // Dispatch a value. At this point, the value is a JavaScript primitive, ie. sequences are
+  // `Array`s, numeric scalars are `Number`s, etc. If a tag was specified, the tag handler
+  // function is asked to post process the value. The value is then sent to the current value
+  // handler in the stack.
+  var dispatch = function(e, value) {
+    if (e.tag !== null) {
+      var tagHandler = tagHandlers[e.tag];
+      // FIXME: Deal with standard tags
+      if (tagHandler)
+        value = tagHandler(value);
+    }
+    handlerStack[0].handle(value);
+  };
 
   // Call into the parser and build the documents.
-  // FIXME: Handle tags and anchors.
-  binding.parse(input, {
+  var documents = [];
+  binding.parse(input, parserHandler = {
+    onDocumentEnd: null,
     onDocumentStart: function(e) {
-      pushHandler(function(v) {
-        document = v;
+      var document;
+      until('onDocumentEnd', {
+        handle: function(value) {
+          document = value;
+        },
+        after: function() {
+          documents.push(document);
+        }
       });
     },
-    onDocumentEnd: function(e) {
-      popHandler();
-      documents.push(document);
+
+    onAlias: function(e) {
+      // FIXME
     },
 
     onScalar: function(e) {
-      newValue(parseScalar(e.value));
+      dispatch(e, parseScalar(e.value));
     },
 
+    onSequenceEnd: null,
     onSequenceStart: function(e) {
       var sequence = [];
-      newValue(sequence);
-      pushHandler(function(v) {
-        sequence.push(v);
+      until('onSequenceEnd', {
+        handle: function(value) {
+          sequence.push(value);
+        },
+        after: function() {
+          dispatch(e, sequence);
+        }
       });
     },
-    onSequenceEnd: function(e) {
-      popHandler();
-    },
 
+    onMappingEnd: null,
     onMappingStart: function(e) {
-      var mapping = {},
-          key,
-          keyHandler = function(v) {
-            key = v;
-            pushHandler(valueHandler);
-          },
-          valueHandler = function(v) {
-            mapping[key] = v;
-            popHandler();
-          };
-      newValue(mapping);
-      pushHandler(keyHandler);
-    },
-    onMappingEnd: function(e) {
-      popHandler();
+      var mapping = {}, key = undefined;
+      until('onMappingEnd', {
+        handle: function(value) {
+          if (key === undefined) {
+            key = value;
+          }
+          else {
+            mapping[key] = value;
+            key = undefined;
+          }
+        },
+        after: function() {
+          dispatch(e, mapping);
+        }
+      });
     }
   });
 
@@ -175,17 +201,22 @@ exports.load = function(input) {
 };
 
 // Helper for quickly reading in a file.
-exports.loadFile = function(filename, callback) {
+exports.loadFile = function(filename, tagHandlers, callback) {
+  if (typeof tagHandlers === 'function') {
+    callback = tagHandlers;
+    tagHandlers = {};
+  }
+
   fs.readFile(filename, 'utf-8', function(err, data) {
     if (err) callback(err, null);
-    else callback(null, exports.load(data));
+    else callback(null, exports.load(data, tagHandlers));
   });
 };
 
 // Synchronous version of loadFile.
-exports.loadFileSync = function(filename) {
+exports.loadFileSync = function(filename, tagHandlers) {
   var data = fs.readFileSync(filename, 'utf-8');
-  return exports.load(data);
+  return exports.load(data, tagHandlers);
 };
 
 // Allow direct requiring of YAML files.

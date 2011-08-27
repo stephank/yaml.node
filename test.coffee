@@ -19,6 +19,11 @@ test = '''
         simple: 01:50:43
         fractional: 01:50:43.83
         negative: -01:50:43
+    tagged: !!map
+      tagged: !!seq
+        - !!str tagged
+      custom tag: !custom
+        foo: true
     Scalar examples from the official spec:
       bool:
         canonical: y
@@ -74,7 +79,11 @@ test = '''
   '''
 
 console.log "===== Parser"
-for document, i in YAML.load(test)
+documents = YAML.load test,
+  '!custom': (v) ->
+    v.bar = yes
+    return v
+for document, i in documents
   console.log "----- Document ##{i+1}"
   console.log document
   console.log ''
