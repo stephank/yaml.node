@@ -278,3 +278,23 @@ exports.dump = function() {
   });
   return emitter.chunks.join('');
 };
+
+// Helper for quickly writing out a file.
+exports.dumpFile = function(filename) {
+  var documents = Array.prototype.slice.call(arguments, 1),
+      numDocuments = documents.length,
+      callback;
+  if (numDocuments !== 0 && typeof documents[numDocuments - 1] === 'function')
+    callback = documents.pop();
+
+  var data = exports.dump.apply(this, documents);
+  fs.writeFile(filename, data, callback);
+};
+
+// Synchronous version of dumpFile.
+exports.dumpFileSync = function(filename) {
+  var documents = Array.prototype.slice.call(arguments, 1);
+
+  var data = exports.dump.apply(this, documents);
+  fs.writeFileSync(filename, data);
+};
