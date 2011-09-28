@@ -43,8 +43,10 @@ var parseScalar = function(v) {
   // JavaScript's `parseInt` does not support binary numbers.
   var m = binRe.exec(v);
   if (m) {
-    var s = m[2], length = s.length, result = 0, i;
-    for (i = 0; i < length; i++) {
+    var s = m[2],
+        length = s.length,
+        result = 0;
+    for (var i = 0; i < length; i++) {
       if (s[i] == '_')
         continue;
       result *= 2;
@@ -59,7 +61,8 @@ var parseScalar = function(v) {
   // JavaScript's datetime parsing is subtly different from YAML's.
   var m = timestampRe.exec(v);
   if (m) {
-    var offset = 0, dateTimePart = m[1].replace('t', 'T');
+    var dateTimePart = m[1].replace('t', 'T'),
+        offset = 0;
     if (m[2] && m[2] !== 'Z') {
       var parts = m[2].split(':');
       offset = parseInt(parts[0], 10) * 100;
@@ -82,10 +85,12 @@ var parseScalar = function(v) {
   // Times.
   var m = timeRe.exec(v);
   if (m) {
-    var parts = m[2].split(':'), length = parts.length, result = 0, i;
-    for (i = 0; i < parts.length; i++) {
+    var parts = m[2].split(':'),
+        length = parts.length,
+        result = 0;
+    for (var i = 0; i < length; i++) {
       result *= 60;
-      if (i + 1 == parts.length)
+      if (length == i + 1)
         result += parseFloat(parts[i]);
       else
         result += parseInt(parts[i], 10);
