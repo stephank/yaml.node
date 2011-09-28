@@ -106,8 +106,20 @@ Parse(const Arguments &args)
     return ThrowException(Exception::TypeError(String::New("Handler must be an object.")));
 
   // Dereference arguments.
-  String::Value input(args[0]);
+  String::Value value(args[0]);
+  const uint16_t *input = *value;
+  size_t size = value.length();
   Local<Object> handler = args[1]->ToObject();
+
+  // Strip the BOM.
+  if (input[0] == 0xFEFF) {
+    input++;
+    size--;
+  }
+
+  // LibYAML expects a UTF-16 character array.
+  const unsigned char *string = (const unsigned char *)input;
+  size *= sizeof(uint16_t);
 
   // Initialize parser.
   yaml_parser_t parser;
@@ -115,8 +127,7 @@ Parse(const Arguments &args)
     return ThrowException(Exception::Error(String::New("YAML parser initialization failed.")));
   // FIXME: Detect endianness?
   yaml_parser_set_encoding(&parser, YAML_UTF16LE_ENCODING);
-  yaml_parser_set_input_string(&parser,
-      (const unsigned char *)*input, input.length() * sizeof(uint16_t));
+  yaml_parser_set_input_string(&parser, string, size);
 
   // Event loop.
   yaml_event_t event;
@@ -456,7 +467,7 @@ private:
 
     // V8 expects UTF-16 as uint16_t.
     const uint16_t *string = (const uint16_t *)buffer;
-    size /= 2;
+    size /= sizeof(uint16_t);
 
     // Strip the BOM.
     if (string[0] == 0xFEFF) {
