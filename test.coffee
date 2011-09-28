@@ -1,5 +1,5 @@
 #!/usr/bin/env coffee
-# YAML.node, © 2010 Stéphan Kochen
+# YAML.node, © 2011 Stéphan Kochen
 # MIT-licensed. (See the included LICENSE file.)
 
 YAML = require './'
