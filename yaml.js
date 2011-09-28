@@ -43,7 +43,7 @@ var parseScalar = function(v) {
   // JavaScript's `parseInt` does not support binary numbers.
   var m = binRe.exec(v);
   if (m) {
-    var s = m[2], length = s.length; result = 0, i;
+    var s = m[2], length = s.length, result = 0, i;
     for (i = 0; i < length; i++) {
       if (s[i] == '_')
         continue;
@@ -62,9 +62,9 @@ var parseScalar = function(v) {
     var offset = 0, dateTimePart = m[1].replace('t', 'T');
     if (m[2] && m[2] !== 'Z') {
       var parts = m[2].split(':');
-      offset = parseInt(parts[0]) * 100;
+      offset = parseInt(parts[0], 10) * 100;
       if (parts.length == 2)
-        offset += parseInt(parts[1]);
+        offset += parseInt(parts[1], 10);
     }
     if (offset >= 0)
       offset = "+" + offset;
@@ -74,8 +74,10 @@ var parseScalar = function(v) {
     return new Date(v + "T00:00:00Z");
 
   // Regular numbers.
-  if (canParseIntRe.test(v))   return parseInt(  v.replace(underscoresRe, ''));
-  if (canParseFloatRe.test(v)) return parseFloat(v.replace(underscoresRe, ''));
+  if (canParseIntRe.test(v))
+    return parseInt(v.replace(underscoresRe, ''), 0);
+  if (canParseFloatRe.test(v))
+    return parseFloat(v.replace(underscoresRe, ''));
 
   // Times.
   var m = timeRe.exec(v);
@@ -86,7 +88,7 @@ var parseScalar = function(v) {
       if (i + 1 == parts.length)
         result += parseFloat(parts[i]);
       else
-        result += parseInt(parts[i]);
+        result += parseInt(parts[i], 10);
     }
     if (m[1] == '-')
       result *= -1;
