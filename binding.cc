@@ -112,7 +112,7 @@ Parse(const Arguments &args)
   Local<Object> handler = args[1]->ToObject();
 
   // Strip the BOM.
-  if (input[0] == 0xFEFF) {
+  if (size != 0 && input[0] == 0xFEFF) {
     input++;
     size--;
   }
