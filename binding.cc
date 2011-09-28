@@ -454,9 +454,19 @@ private:
     Emitter *e = (Emitter *)data;
     HandleScope scope;
 
+    // V8 expects UTF-16 as uint16_t.
+    const uint16_t *string = (const uint16_t *)buffer;
+    size /= 2;
+
+    // Strip the BOM.
+    if (string[0] == 0xFEFF) {
+      string++;
+      size--;
+    }
+
+    // Append to the array of chunks.
     TryCatch try_catch;
-    e->chunks_->Set(e->chunks_pos_++, String::New(
-        (const uint16_t *)buffer, size / sizeof(uint16_t)));
+    e->chunks_->Set(e->chunks_pos_++, String::New(string, size));
     if (try_catch.HasCaught()) {
       FatalException(try_catch);
       return 0;
