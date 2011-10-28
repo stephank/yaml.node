@@ -240,6 +240,7 @@ var serialize = function(emitter, item) {
       emitter.scalar(item);
       break;
     case "object":
+      // FIXME: Handle Dates.
       if (!item) {
         emitter.scalar('~');
       }
@@ -261,8 +262,17 @@ var serialize = function(emitter, item) {
         });
       }
       break;
+    case "number":
+      if (item === Infinity)
+        emitter.scalar(".inf");
+      else if (item === -Infinity)
+        emitter.scalar("-.inf");
+      else if (isNaN(item))
+        emitter.scalar(".NaN");
+      else
+        emitter.scalar(String(item));
+      break;
     default:
-      // FIXME: Properly serialize some special scalars (inf, datetimes, etc.)
       emitter.scalar(String(item));
       break;
   }
