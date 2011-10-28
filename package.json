@@ -15,10 +15,17 @@
   },
 
   "engines": {
-    "node": "0.4"
+    "node": ">=0.4.0"
   },
+  "dependencies": {},
+  "devDependencies": {
+    "underscore": "1",
+    "tap": "0.0.x"
+  },
+
   "scripts": {
-    "install": "node-waf configure build"
+    "install": "node-waf configure build",
+    "test": "tap ./tests/*.js"
   },
 
   "main": "./yaml.js"

@@ -1,0 +1,8 @@
+# Test booleans, case shouldn't matter.
+
+- true
+- fALse
+- YES
+- no
+- On
+- oFF

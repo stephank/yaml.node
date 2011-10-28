@@ -1,0 +1,16 @@
+# Test multiple documents, different root types.
+
+---
+- a
+- b
+- c
+
+---
+first: 1
+second: 2
+
+--- test
+--- 3
+--- 5.2
+--- yes
+--- ~

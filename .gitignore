@@ -1,3 +1,4 @@
-.lock-wscript
-binding.node
-build
+/.lock-wscript
+/binding.node
+/build
+/node_modules
