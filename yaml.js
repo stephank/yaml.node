@@ -240,9 +240,11 @@ var serialize = function(emitter, item) {
       emitter.scalar(item);
       break;
     case "object":
-      // FIXME: Handle Dates.
       if (!item) {
         emitter.scalar('~');
+      }
+      else if (item instanceof Date) {
+        emitter.scalar(item.toISOString());
       }
       else if (item.length) {
         emitter.sequence(function() {
