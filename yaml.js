@@ -2,7 +2,7 @@
 // MIT-licensed. (See the included LICENSE file.)
 
 var fs = require('fs'),
-    binding = exports.capi = require('./binding');
+    binding = exports.capi = require('./build/Release/binding');
 
 
 // Most of these were derived from: http://yaml.org/type/

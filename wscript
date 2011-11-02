@@ -7,6 +7,7 @@ def set_options(opt):
   opt.tool_options("compiler_cxx")
 
 def configure(conf):
+  conf.env.set_variant("Release")
   conf.check_tool("compiler_cxx")
   conf.check_tool("node_addon")
   if not conf.check(lib='yaml'):
@@ -18,9 +19,3 @@ def build(bld):
   obj.target = "binding"
   obj.source = "binding.cc"
   obj.lib = ["yaml"]
-
-def shutdown():
-  if exists('./binding.node'):
-    unlink('./binding.node')
-  if Options.commands['build']:
-    symlink('./build/default/binding.node', './binding.node')
