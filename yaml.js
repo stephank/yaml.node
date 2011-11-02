@@ -1,8 +1,7 @@
 // YAML.node, © 2011 Stéphan Kochen
 // MIT-licensed. (See the included LICENSE file.)
 
-var sys = require('sys'),
-    fs = require('fs'),
+var fs = require('fs'),
     binding = exports.capi = require('./binding');
 
 
