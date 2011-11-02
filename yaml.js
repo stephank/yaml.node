@@ -23,6 +23,12 @@ var definitelyNonNumericRe = /^[a-z~]/i,
     timestampRe = /^(\d{4}-\d\d?-\d\d?(?:[Tt]|\s+)\d\d?:\d\d:\d\d(?:\.\d*)?)(?:\s*(Z|[-+]\d\d?(?::\d\d)?))?$/,
     underscoresRe = /_/g;
 
+// Tiny helper to pad a string.
+var pad = function(s, num, ch) {
+  while (s.length < num) s = ch + s;
+  return s;
+};
+
 // Helper function that converts a string scalar to its actual type.
 var parseScalar = function(v) {
   if (!v) return null;
@@ -69,7 +75,9 @@ var parseScalar = function(v) {
         offset += parseInt(parts[1], 10);
     }
     if (offset >= 0)
-      offset = "+" + offset;
+      offset = "+" + pad(String(offset), 4, '0');
+    else
+      offset = "-" + pad(String(Math.abs(offset)), 4, '0');
     return new Date(dateTimePart + offset);
   }
   if (dateRe.test(v))
