@@ -29,7 +29,7 @@ exports.load = function(name, tags, expected) {
     var input = yaml.loadFileSync(file, tags);
 
     t.ok(_.isEqual(input, expected), 'load YAML', {
-      input: input,
+      input: util.inspect(input),
       expected: util.inspect(expected)
     });
     t.end();
