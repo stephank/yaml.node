@@ -17,6 +17,12 @@ exports.withYamlAndJs = function(name, js) {
 };
 
 
+// Path helper for YAML input.
+exports.inputPath = function(name) {
+  return path.resolve(module.filename, '..', 'tests', name + '.yaml');
+};
+
+
 // Load YAML and compare with expected JS repr.
 exports.load = function(name, tags, expected) {
   if (expected === undefined) {
@@ -25,7 +31,7 @@ exports.load = function(name, tags, expected) {
   }
 
   test(name, function(t) {
-    var file = path.resolve(module.filename, '..', 'tests', name + '.yaml');
+    var file = exports.inputPath(name);
     var input = yaml.loadFileSync(file, tags);
 
     t.ok(_.isEqual(input, expected), 'load YAML', {

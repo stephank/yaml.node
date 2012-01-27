@@ -24,6 +24,12 @@ static Persistent<String> on_sequence_end_symbol;
 static Persistent<String> on_mapping_start_symbol;
 static Persistent<String> on_mapping_end_symbol;
 
+// Error attributes.
+static Persistent<String> offset_symbol;
+static Persistent<String> context_symbol;
+static Persistent<String> problem_symbol;
+static Persistent<String> description_symbol;
+
 // Event mark attributes.
 static Persistent<String> start_symbol;
 static Persistent<String> end_symbol;
@@ -91,6 +97,68 @@ FromMark(yaml_mark_t &mark)
 }
 
 
+// Create an V8 exception from a YAML error.
+static inline Local<Value>
+ExceptionFromParserError(yaml_parser_t &parser)
+{
+  if (parser.error == YAML_MEMORY_ERROR)
+    throw std::bad_alloc();
+
+  Local<String> problem = String::New(
+      parser.problem ? parser.problem : "Unknown error");
+
+  Local<Object> error, mark;
+  switch (parser.error) {
+    case YAML_READER_ERROR:
+      problem = String::Concat(problem, String::New(", at byte offset "));
+      problem = String::Concat(problem,
+          Integer::NewFromUnsigned(parser.problem_offset)->ToString());
+      error = Local<Object>::Cast(Exception::Error(problem));
+
+      mark = Object::New();
+      mark->Set(offset_symbol, Integer::NewFromUnsigned(parser.problem_offset));
+      mark->Set(value_symbol, Integer::NewFromUnsigned(parser.problem_value));
+      if (parser.problem != NULL)
+        mark->Set(description_symbol, String::New(parser.problem));
+      error->Set(problem_symbol, mark);
+
+      break;
+
+    case YAML_SCANNER_ERROR:
+    case YAML_PARSER_ERROR:
+      if (parser.context != NULL) {
+        problem = String::Concat(problem, String::New(", "));
+        problem = String::Concat(problem, String::New(parser.context));
+      }
+      if (parser.problem != NULL) {
+        problem = String::Concat(problem, String::New(", on line "));
+        problem = String::Concat(problem,
+            Integer::NewFromUnsigned(parser.problem_mark.line)->ToString());
+      }
+      error = Local<Object>::Cast(Exception::Error(problem));
+
+      if (parser.context != NULL) {
+        mark = FromMark(parser.context_mark);
+        mark->Set(description_symbol, String::New(parser.context));
+        error->Set(context_symbol, mark);
+      }
+
+      if (parser.problem != NULL) {
+        mark = FromMark(parser.problem_mark);
+        mark->Set(description_symbol, String::New(parser.problem));
+        error->Set(problem_symbol, mark);
+      }
+
+      break;
+
+    default:
+      break;
+  }
+
+  return error;
+}
+
+
 // The workhorse.
 static Handle<Value>
 Parse(const Arguments &args)
@@ -124,7 +192,7 @@ Parse(const Arguments &args)
   // Initialize parser.
   yaml_parser_t parser;
   if (!yaml_parser_initialize(&parser))
-    return ThrowException(Exception::Error(String::New("YAML parser initialization failed.")));
+    throw std::bad_alloc();
   // FIXME: Detect endianness?
   yaml_parser_set_encoding(&parser, YAML_UTF16LE_ENCODING);
   yaml_parser_set_input_string(&parser, string, size);
@@ -135,9 +203,13 @@ Parse(const Arguments &args)
   Local<Value> method;
   Local<Object> obj, tmp;
   Local<Value> params[1];
-  while (yaml_parser_parse(&parser, &event)) {
+  while (1) {
+    if (yaml_parser_parse(&parser, &event) == 0)
+      return ThrowException(ExceptionFromParserError(parser));
+
     // Find the right handler method.
     switch (event.type) {
+      case YAML_NO_EVENT:             goto loop_end;
       case YAML_STREAM_START_EVENT:   method_name = *on_stream_start_symbol;   break;
       case YAML_STREAM_END_EVENT:     method_name = *on_stream_end_symbol;     break;
       case YAML_DOCUMENT_START_EVENT: method_name = *on_document_start_symbol; break;
@@ -148,7 +220,6 @@ Parse(const Arguments &args)
       case YAML_SEQUENCE_END_EVENT:   method_name = *on_sequence_end_symbol;   break;
       case YAML_MAPPING_START_EVENT:  method_name = *on_mapping_start_symbol;  break;
       case YAML_MAPPING_END_EVENT:    method_name = *on_mapping_end_symbol;    break;
-      default: goto loop_end;
     }
     method = handler->Get(method_name);
     if (!method->IsFunction())
@@ -276,7 +347,7 @@ private:
     HandleScope scope;
 
     if (!yaml_emitter_initialize(&emitter_))
-      throw new std::runtime_error("YAML emitter initialization failed.");
+      throw std::bad_alloc();
     // FIXME: Detect endianness?
     yaml_emitter_set_encoding(&emitter_, YAML_UTF16LE_ENCODING);
     yaml_emitter_set_output(&emitter_, WriteHandler, this);
@@ -516,6 +587,11 @@ Initialize(Handle<Object> target)
   on_sequence_end_symbol   = NODE_PSYMBOL("onSequenceEnd");
   on_mapping_start_symbol  = NODE_PSYMBOL("onMappingStart");
   on_mapping_end_symbol    = NODE_PSYMBOL("onMappingEnd");
+
+  offset_symbol      = NODE_PSYMBOL("offset");
+  context_symbol     = NODE_PSYMBOL("context");
+  problem_symbol     = NODE_PSYMBOL("problem");
+  description_symbol = NODE_PSYMBOL("description");
 
   start_symbol = NODE_PSYMBOL("start");
   end_symbol   = NODE_PSYMBOL("end");
