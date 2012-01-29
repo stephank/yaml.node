@@ -5,6 +5,33 @@ var fs = require('fs'),
     binding = exports.capi = require('./build/Release/binding');
 
 
+// Low-level YAML stream exports.
+exports.stream = {}
+
+// Parse a YAML stream and call back with events.
+//
+//     yaml.stream.parse(input, handler);
+//
+// The handler can be an object that exposes methods for each LibYAML parser event. These are
+// named `onScalar`, `onSequenceStart`, etc. All of these methods take an event object that is
+// similar in structure to a flattened `yaml_event_t`.
+//
+// Alternatively, a single function can be passed in to handle all events.
+exports.stream.parse = function(input, handler) {
+  if (typeof(handler) !== 'function') {
+    var orig = handler;
+    handler = function(event) {
+      var type = event.type;
+      var method = 'on' + type.charAt(0).toUpperCase() + type.slice(1);
+      if (typeof(orig[method]) === 'function')
+        orig[method](event);
+    };
+  }
+
+  binding.parse(input, handler);
+};
+
+
 // Most of these were derived from: http://yaml.org/type/
 // Also borrows from tenderlove's `Psych::ScalarScanner`. (MIT-licensed)
 var definitelyNonNumericRe = /^[a-z~]/i,
@@ -110,16 +137,6 @@ var parseScalar = function(v) {
   return v;
 };
 
-// Binding to LibYAML's stream parser. The function signature is:
-//
-//     yaml.parse(input, handler);
-//
-// Where `input` is a string, and `handler` an object.
-//
-// The handler object exposes methods for each LibYAML parser event. These are named `onScalar`,
-// `onSequenceStart`, etc. All of these methods take an event object that is similar in structure
-// to a flattened `yaml_event_t`.
-exports.parse = binding.parse;
 
 // The `load` function reads all documents from the given string input. The return value is an
 // array of documents found represented as plain JavaScript objects, arrays and primitives.
@@ -158,7 +175,7 @@ exports.load = function(input, tagHandlers) {
 
   // Call into the parser and build the documents.
   var documents = [];
-  binding.parse(input, parserHandler = {
+  exports.stream.parse(input, parserHandler = {
     onDocumentEnd: null,
     onDocumentStart: function(e) {
       var document;

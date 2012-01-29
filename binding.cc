@@ -12,27 +12,17 @@ using namespace node;
 namespace yaml {
 
 
-// Handler method names.
-static Persistent<String> on_stream_start_symbol;
-static Persistent<String> on_stream_end_symbol;
-static Persistent<String> on_document_start_symbol;
-static Persistent<String> on_document_end_symbol;
-static Persistent<String> on_alias_symbol;
-static Persistent<String> on_scalar_symbol;
-static Persistent<String> on_sequence_start_symbol;
-static Persistent<String> on_sequence_end_symbol;
-static Persistent<String> on_mapping_start_symbol;
-static Persistent<String> on_mapping_end_symbol;
-
-// Error attributes.
-static Persistent<String> offset_symbol;
-static Persistent<String> context_symbol;
-static Persistent<String> problem_symbol;
-static Persistent<String> description_symbol;
-
-// Event mark attributes.
-static Persistent<String> start_symbol;
-static Persistent<String> end_symbol;
+// Event types.
+static Persistent<String> stream_start_symbol;
+static Persistent<String> stream_end_symbol;
+static Persistent<String> document_start_symbol;
+static Persistent<String> document_end_symbol;
+static Persistent<String> alias_symbol;
+static Persistent<String> scalar_symbol;
+static Persistent<String> sequence_start_symbol;
+static Persistent<String> sequence_end_symbol;
+static Persistent<String> mapping_start_symbol;
+static Persistent<String> mapping_end_symbol;
 
 // Mark attributes.
 static Persistent<String> index_symbol;
@@ -40,6 +30,9 @@ static Persistent<String> line_symbol;
 static Persistent<String> column_symbol;
 
 // Event attributes.
+static Persistent<String> type_symbol;
+static Persistent<String> start_symbol;
+static Persistent<String> end_symbol;
 static Persistent<String> major_symbol;
 static Persistent<String> minor_symbol;
 static Persistent<String> version_symbol;
@@ -61,6 +54,13 @@ static Persistent<String> folded_symbol;
 // Sequence and mapping styles.
 static Persistent<String> block_symbol;
 static Persistent<String> flow_symbol;
+
+// Error attributes.
+static Persistent<String> offset_symbol;
+//static Persistent<String> value_symbol;
+static Persistent<String> context_symbol;
+static Persistent<String> problem_symbol;
+static Persistent<String> description_symbol;
 
 
 // Convert from LibYAML's booleans.
@@ -97,7 +97,108 @@ MarkToJs(yaml_mark_t &mark)
 }
 
 
-// Create an Error from the libYAML parser state.
+// Create an object from a LibYAML event.
+static inline Local<Object>
+EventToJs(yaml_event_t &event)
+{
+  Local<Object> obj, tmp;
+
+  // Create the event object.
+  obj = Object::New();
+  obj->Set(start_symbol, MarkToJs(event.start_mark));
+  obj->Set(end_symbol,   MarkToJs(event.end_mark));
+
+  switch (event.type) {
+    case YAML_STREAM_START_EVENT:
+      obj->Set(type_symbol, stream_start_symbol);
+      break;
+
+    case YAML_STREAM_END_EVENT:
+      obj->Set(type_symbol, stream_end_symbol);
+      break;
+
+    case YAML_DOCUMENT_START_EVENT:
+      obj->Set(type_symbol, document_start_symbol);
+      if (event.data.document_start.version_directive) {
+        tmp = Object::New();
+        tmp->Set(major_symbol, Integer::New(event.data.document_start.version_directive->major));
+        tmp->Set(minor_symbol, Integer::New(event.data.document_start.version_directive->minor));
+        obj->Set(version_symbol, tmp);
+      }
+      else
+        obj->Set(version_symbol, Null());
+      obj->Set(implicit_symbol, BoolToJs(event.data.document_start.implicit));
+      break;
+
+    case YAML_DOCUMENT_END_EVENT:
+      obj->Set(type_symbol, document_end_symbol);
+      obj->Set(implicit_symbol, BoolToJs(event.data.document_end.implicit));
+      break;
+
+    case YAML_ALIAS_EVENT:
+      obj->Set(type_symbol, alias_symbol);
+      obj->Set(anchor_symbol, StringToJs(event.data.alias.anchor));
+      break;
+
+    case YAML_SCALAR_EVENT:
+      obj->Set(type_symbol, scalar_symbol);
+      obj->Set(anchor_symbol, StringToJs(event.data.scalar.anchor));
+      obj->Set(tag_symbol,    StringToJs(event.data.scalar.tag));
+      obj->Set(value_symbol,  StringToJs(event.data.scalar.value, event.data.scalar.length));
+      obj->Set(plain_implicit_symbol,  BoolToJs(event.data.scalar.plain_implicit));
+      obj->Set(quoted_implicit_symbol, BoolToJs(event.data.scalar.quoted_implicit));
+      switch (event.data.scalar.style) {
+        case YAML_PLAIN_SCALAR_STYLE:         obj->Set(style_symbol, plain_symbol);         break;
+        case YAML_SINGLE_QUOTED_SCALAR_STYLE: obj->Set(style_symbol, single_quoted_symbol); break;
+        case YAML_DOUBLE_QUOTED_SCALAR_STYLE: obj->Set(style_symbol, double_quoted_symbol); break;
+        case YAML_LITERAL_SCALAR_STYLE:       obj->Set(style_symbol, literal_symbol);       break;
+        case YAML_FOLDED_SCALAR_STYLE:        obj->Set(style_symbol, folded_symbol);        break;
+        default: break;
+      }
+      break;
+
+    case YAML_SEQUENCE_START_EVENT:
+      obj->Set(type_symbol, sequence_start_symbol);
+      obj->Set(anchor_symbol,    StringToJs(event.data.sequence_start.anchor));
+      obj->Set(tag_symbol,       StringToJs(event.data.sequence_start.tag));
+      obj->Set(implicit_symbol, BoolToJs(event.data.sequence_start.implicit));
+      switch (event.data.sequence_start.style) {
+        case YAML_BLOCK_SEQUENCE_STYLE: obj->Set(style_symbol, block_symbol); break;
+        case YAML_FLOW_SEQUENCE_STYLE:  obj->Set(style_symbol, flow_symbol);  break;
+        default: break;
+      }
+      break;
+
+    case YAML_SEQUENCE_END_EVENT:
+      obj->Set(type_symbol, sequence_end_symbol);
+      break;
+
+    case YAML_MAPPING_START_EVENT:
+      obj->Set(type_symbol, mapping_start_symbol);
+      obj->Set(anchor_symbol,    StringToJs(event.data.mapping_start.anchor));
+      obj->Set(tag_symbol,       StringToJs(event.data.mapping_start.tag));
+      obj->Set(implicit_symbol, BoolToJs(event.data.mapping_start.implicit));
+      switch (event.data.mapping_start.style) {
+        case YAML_BLOCK_MAPPING_STYLE: obj->Set(style_symbol, block_symbol); break;
+        case YAML_FLOW_MAPPING_STYLE:  obj->Set(style_symbol, flow_symbol);  break;
+        default: break;
+      }
+      break;
+
+    case YAML_MAPPING_END_EVENT:
+      obj->Set(type_symbol, mapping_end_symbol);
+      break;
+
+    default:
+      obj->Set(type_symbol, Null());
+      break;
+  }
+
+  return obj;
+}
+
+
+// Create an Error from the LibYAML parser state.
 static inline Local<Value>
 ParserErrorToJs(yaml_parser_t &parser)
 {
@@ -161,13 +262,9 @@ ParserErrorToJs(yaml_parser_t &parser)
 
 // Binding to LibYAML's stream parser. The function signature is:
 //
-//     yaml.parse(input, handler);
+//     parse(input, handler);
 //
-// Where `input` is a string, and `handler` an object.
-//
-// The handler object exposes methods for each LibYAML parser event. These are named `onScalar`,
-// `onSequenceStart`, etc. All of these methods take an event object that is similar in structure
-// to a flattened `yaml_event_t`.
+// Where `input` is a string, and `handler` is a function receiving event objects.
 static Handle<Value>
 Parse(const Arguments &args)
 {
@@ -176,16 +273,16 @@ Parse(const Arguments &args)
   // Check arguments.
   if (args.Length() != 2)
     return ThrowException(Exception::Error(String::New("Two arguments were expected.")));
-  if (!args[0]->IsString()) 
+  if (!args[0]->IsString())
     return ThrowException(Exception::TypeError(String::New("Input must be a string.")));
-  if (!args[1]->IsObject()) 
-    return ThrowException(Exception::TypeError(String::New("Handler must be an object.")));
+  if (!args[1]->IsFunction())
+    return ThrowException(Exception::TypeError(String::New("Handler must be a function.")));
 
   // Dereference arguments.
   String::Value value(args[0]);
   const uint16_t *input = *value;
   size_t size = value.length();
-  Local<Object> handler = args[1]->ToObject();
+  Local<Function> handler = Local<Function>::Cast(args[1]);
 
   // Strip the BOM.
   if (size != 0 && input[0] == 0xFEFF) {
@@ -207,112 +304,23 @@ Parse(const Arguments &args)
 
   // Event loop.
   yaml_event_t event;
-  Local<String> method_name;
-  Local<Value> method;
-  Local<Object> obj, tmp;
-  Local<Value> params[1];
-  while (1) {
+  while (true) {
+    // Get the next event, or throw an exception.
     if (yaml_parser_parse(&parser, &event) == 0)
       return ThrowException(ParserErrorToJs(parser));
 
-    // Find the right handler method.
-    switch (event.type) {
-      case YAML_NO_EVENT:             goto loop_end;
-      case YAML_STREAM_START_EVENT:   method_name = *on_stream_start_symbol;   break;
-      case YAML_STREAM_END_EVENT:     method_name = *on_stream_end_symbol;     break;
-      case YAML_DOCUMENT_START_EVENT: method_name = *on_document_start_symbol; break;
-      case YAML_DOCUMENT_END_EVENT:   method_name = *on_document_end_symbol;   break;
-      case YAML_ALIAS_EVENT:          method_name = *on_alias_symbol;          break;
-      case YAML_SCALAR_EVENT:         method_name = *on_scalar_symbol;         break;
-      case YAML_SEQUENCE_START_EVENT: method_name = *on_sequence_start_symbol; break;
-      case YAML_SEQUENCE_END_EVENT:   method_name = *on_sequence_end_symbol;   break;
-      case YAML_MAPPING_START_EVENT:  method_name = *on_mapping_start_symbol;  break;
-      case YAML_MAPPING_END_EVENT:    method_name = *on_mapping_end_symbol;    break;
-    }
-    method = handler->Get(method_name);
-    if (!method->IsFunction())
-      goto loop_end;
-
-    // Create the event object.
-    obj = Object::New();
-    obj->Set(start_symbol, MarkToJs(event.start_mark));
-    obj->Set(end_symbol,   MarkToJs(event.end_mark));
-
-    switch (event.type) {
-      case YAML_DOCUMENT_START_EVENT:
-        if (event.data.document_start.version_directive) {
-          tmp = Object::New();
-          tmp->Set(major_symbol, Integer::New(event.data.document_start.version_directive->major));
-          tmp->Set(minor_symbol, Integer::New(event.data.document_start.version_directive->minor));
-          obj->Set(version_symbol, tmp);
-        }
-        else
-          obj->Set(version_symbol, Null());
-        obj->Set(implicit_symbol, BoolToJs(event.data.document_start.implicit));
-        break;
-
-      case YAML_DOCUMENT_END_EVENT:
-        obj->Set(implicit_symbol, BoolToJs(event.data.document_end.implicit));
-        break;
-
-      case YAML_ALIAS_EVENT:
-        obj->Set(anchor_symbol, StringToJs(event.data.alias.anchor));
-        break;
-
-      case YAML_SCALAR_EVENT:
-        obj->Set(anchor_symbol, StringToJs(event.data.scalar.anchor));
-        obj->Set(tag_symbol,    StringToJs(event.data.scalar.tag));
-        obj->Set(value_symbol,  StringToJs(event.data.scalar.value, event.data.scalar.length));
-        obj->Set(plain_implicit_symbol,  BoolToJs(event.data.scalar.plain_implicit));
-        obj->Set(quoted_implicit_symbol, BoolToJs(event.data.scalar.quoted_implicit));
-        switch (event.data.scalar.style) {
-          case YAML_PLAIN_SCALAR_STYLE:         obj->Set(style_symbol, plain_symbol);         break;
-          case YAML_SINGLE_QUOTED_SCALAR_STYLE: obj->Set(style_symbol, single_quoted_symbol); break;
-          case YAML_DOUBLE_QUOTED_SCALAR_STYLE: obj->Set(style_symbol, double_quoted_symbol); break;
-          case YAML_LITERAL_SCALAR_STYLE:       obj->Set(style_symbol, literal_symbol);       break;
-          case YAML_FOLDED_SCALAR_STYLE:        obj->Set(style_symbol, folded_symbol);        break;
-          default: break;
-        }
-        break;
-
-      case YAML_SEQUENCE_START_EVENT:
-        obj->Set(anchor_symbol,    StringToJs(event.data.sequence_start.anchor));
-        obj->Set(tag_symbol,       StringToJs(event.data.sequence_start.tag));
-        obj->Set(implicit_symbol, BoolToJs(event.data.sequence_start.implicit));
-        switch (event.data.sequence_start.style) {
-          case YAML_BLOCK_SEQUENCE_STYLE: obj->Set(style_symbol, block_symbol); break;
-          case YAML_FLOW_SEQUENCE_STYLE:  obj->Set(style_symbol, flow_symbol);  break;
-          default: break;
-        }
-        break;
-
-      case YAML_MAPPING_START_EVENT:
-        obj->Set(anchor_symbol,    StringToJs(event.data.mapping_start.anchor));
-        obj->Set(tag_symbol,       StringToJs(event.data.mapping_start.tag));
-        obj->Set(implicit_symbol, BoolToJs(event.data.mapping_start.implicit));
-        switch (event.data.mapping_start.style) {
-          case YAML_BLOCK_MAPPING_STYLE: obj->Set(style_symbol, block_symbol); break;
-          case YAML_FLOW_MAPPING_STYLE:  obj->Set(style_symbol, flow_symbol);  break;
-          default: break;
-        }
-        break;
-
-      default:
-        break;
-    }
-
     // Call the handler method.
-    params[0] = obj;
-    Handle<Function>::Cast(method)->Call(handler, 1, params);
+    Local<Value> params[1] = { EventToJs(event) };
+    handler->Call(Context::GetCurrent()->Global(), 1, params);
 
-  loop_end:
     // Clean up the event.
     if (event.type == YAML_STREAM_END_EVENT) {
       yaml_event_delete(&event);
       break;
     }
-    else
+    else {
       yaml_event_delete(&event);
+    }
   }
 
   // Clean up the parser.
@@ -591,29 +599,24 @@ Initialize(Handle<Object> target)
 {
   HandleScope scope;
 
-  on_stream_start_symbol   = NODE_PSYMBOL("onStreamStart");
-  on_stream_end_symbol     = NODE_PSYMBOL("onStreamEnd");
-  on_document_start_symbol = NODE_PSYMBOL("onDocumentStart");
-  on_document_end_symbol   = NODE_PSYMBOL("onDocumentEnd");
-  on_alias_symbol          = NODE_PSYMBOL("onAlias");
-  on_scalar_symbol         = NODE_PSYMBOL("onScalar");
-  on_sequence_start_symbol = NODE_PSYMBOL("onSequenceStart");
-  on_sequence_end_symbol   = NODE_PSYMBOL("onSequenceEnd");
-  on_mapping_start_symbol  = NODE_PSYMBOL("onMappingStart");
-  on_mapping_end_symbol    = NODE_PSYMBOL("onMappingEnd");
-
-  offset_symbol      = NODE_PSYMBOL("offset");
-  context_symbol     = NODE_PSYMBOL("context");
-  problem_symbol     = NODE_PSYMBOL("problem");
-  description_symbol = NODE_PSYMBOL("description");
-
-  start_symbol = NODE_PSYMBOL("start");
-  end_symbol   = NODE_PSYMBOL("end");
+  stream_start_symbol   = NODE_PSYMBOL("streamStart");
+  stream_end_symbol     = NODE_PSYMBOL("streamEnd");
+  document_start_symbol = NODE_PSYMBOL("documentStart");
+  document_end_symbol   = NODE_PSYMBOL("documentEnd");
+  alias_symbol          = NODE_PSYMBOL("alias");
+  scalar_symbol         = NODE_PSYMBOL("scalar");
+  sequence_start_symbol = NODE_PSYMBOL("sequenceStart");
+  sequence_end_symbol   = NODE_PSYMBOL("sequenceEnd");
+  mapping_start_symbol  = NODE_PSYMBOL("mappingStart");
+  mapping_end_symbol    = NODE_PSYMBOL("mappingEnd");
 
   index_symbol  = NODE_PSYMBOL("index");
   line_symbol   = NODE_PSYMBOL("line");
   column_symbol = NODE_PSYMBOL("column");
 
+  start_symbol    = NODE_PSYMBOL("start");
+  end_symbol      = NODE_PSYMBOL("end");
+  type_symbol     = NODE_PSYMBOL("type");
   major_symbol    = NODE_PSYMBOL("major");
   minor_symbol    = NODE_PSYMBOL("minor");
   version_symbol  = NODE_PSYMBOL("version");
@@ -633,6 +636,12 @@ Initialize(Handle<Object> target)
 
   block_symbol = NODE_PSYMBOL("block");
   flow_symbol  = NODE_PSYMBOL("flow");
+
+  offset_symbol      = NODE_PSYMBOL("offset");
+  // value_symbol    = NODE_PSYMBOL("value");
+  context_symbol     = NODE_PSYMBOL("context");
+  problem_symbol     = NODE_PSYMBOL("problem");
+  description_symbol = NODE_PSYMBOL("description");
 
   Local<FunctionTemplate> parse_template = FunctionTemplate::New(Parse);
   target->Set(String::NewSymbol("parse"), parse_template->GetFunction());
