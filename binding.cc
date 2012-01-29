@@ -383,12 +383,7 @@ private:
   New(const Arguments &args)
   {
     Emitter *e;
-    try {
-      e = new Emitter();
-    }
-    catch (const std::exception &exc) {
-      return ThrowException(Exception::Error(String::New(exc.what())));
-    }
+    e = new Emitter();
     e->Wrap(args.This());
     return e->handle_;
   }
