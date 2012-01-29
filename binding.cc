@@ -345,7 +345,6 @@ public:
   {
     Local<FunctionTemplate> t = FunctionTemplate::New(New);
     t->InstanceTemplate()->SetInternalFieldCount(1);
-    t->InstanceTemplate()->SetAccessor(String::NewSymbol("chunks"), GetChunks, NULL);
 
     NODE_SET_PROTOTYPE_METHOD(t, "stream", Stream);
     NODE_SET_PROTOTYPE_METHOD(t, "document", Document);
@@ -360,30 +359,34 @@ public:
   virtual
   ~Emitter()
   {
-    chunks_.Dispose();
+    writeCallback_.Dispose();
     yaml_emitter_delete(&emitter_);
   }
 
 private:
-  Emitter()
+  Emitter(Handle<Function> writeCallback)
   {
-    HandleScope scope;
-
     if (!yaml_emitter_initialize(&emitter_))
       throw std::bad_alloc();
     // FIXME: Detect endianness?
     yaml_emitter_set_encoding(&emitter_, YAML_UTF16LE_ENCODING);
     yaml_emitter_set_output(&emitter_, WriteHandler, this);
 
-    chunks_ = Persistent<Array>::New(Array::New());
-    chunks_pos_ = 0;
+    writeCallback_ = Persistent<Function>::New(writeCallback);
   }
 
   static Handle<Value>
   New(const Arguments &args)
   {
-    Emitter *e;
-    e = new Emitter();
+    if (args.Length() != 1)
+        return ThrowException(Exception::TypeError(
+            String::New("Expected one argument")));
+    if (!args[0]->IsFunction())
+        return ThrowException(Exception::TypeError(
+            String::New("Expected a function")));
+    Local<Function> writeCallback = Local<Function>::Cast(args[0]);
+
+    Emitter *e = new Emitter(writeCallback);
     e->Wrap(args.This());
     return e->handle_;
   }
@@ -564,9 +567,10 @@ private:
       size--;
     }
 
-    // Append to the array of chunks.
+    // Call the write callback.
     TryCatch try_catch;
-    e->chunks_->Set(e->chunks_pos_++, String::New(string, size));
+    Local<Value> params[1] = { String::New(string, size) };
+    e->writeCallback_->Call(Context::GetCurrent()->Global(), 1, params);
     if (try_catch.HasCaught()) {
       FatalException(try_catch);
       return 0;
@@ -575,17 +579,9 @@ private:
     return 1;
   }
 
-  static Handle<Value>
-  GetChunks(Local<String> property, const AccessorInfo &info)
-  {
-    Emitter *e = ObjectWrap::Unwrap<Emitter>(info.Holder());
-    return Local<Array>::New(e->chunks_);
-  }
-
 private:
   yaml_emitter_t emitter_;
-  Persistent<Array> chunks_;
-  size_t chunks_pos_;
+  Persistent<Function> writeCallback_;
 };
 
 

@@ -112,7 +112,7 @@ var parseScalar = function(v) {
 
 // Binding to LibYAML's stream parser. The function signature is:
 //
-//     yaml.parse(input, handler)
+//     yaml.parse(input, handler);
 //
 // Where `input` is a string, and `handler` an object.
 //
@@ -312,8 +312,10 @@ var serialize = function(emitter, item) {
 // and the arguments should be plain JavaScript objects, arrays or primitives. Each argument is
 // treated as a single document to serialize. The return value is a string.
 exports.dump = function() {
-  var emitter = new binding.Emitter(),
-      documents = arguments;
+  var documents = arguments, chunks = [], emitter;
+  emitter = new binding.Emitter(function(chunk) {
+    chunks.push(chunk);
+  });
   emitter.stream(function() {
     var length = documents.length;
     for (var i = 0; i < length; i++) {
@@ -323,7 +325,7 @@ exports.dump = function() {
       });
     }
   });
-  return emitter.chunks.join('');
+  return chunks.join('');
 };
 
 // Helper for quickly writing out a file.
