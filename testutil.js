@@ -5,54 +5,54 @@ var test = require('tap').test;
 var yaml = require('./yaml');
 
 
-// Test that only provides JS repr.
-exports.withJs = function(name, js) {
-  exports.dumpAndLoad(name, js);
-};
-
-// Test that provides both YAML and JS repr.
-exports.withYamlAndJs = function(name, js) {
-  exports.load(name, js);
-  exports.dumpAndLoad(name, js);
+// Helper that, given a Test, returns the path to the YAML input file.
+var inputPath = exports.inputPath = function(t) {
+  return path.resolve(module.filename, '..', 'tests', t.conf.name + '.yaml');
 };
 
 
-// Path helper for YAML input.
-exports.inputPath = function(name) {
-  return path.resolve(module.filename, '..', 'tests', name + '.yaml');
+// The basic tests provided have YAML and JSON representations. The YAML is loaded and compared
+// to the JSON. In addition, the JSON is dumped to YAML, loaded back in and compared again to
+// test our emitter.
+exports.simple = function(name, js) {
+  test(name, function(t) {
+    t.plan(2);
+    load(t, js);
+    dumpAndLoad(t, js);
+  });
 };
 
 
-// Load YAML and compare with expected JS repr.
-exports.load = function(name, tags, expected) {
+// Load the YAML for a Test, and compare it with the expected JSON.
+var load = function(t, tags, expected) {
   if (expected === undefined) {
     expected = tags;
     tags = undefined;
   }
 
-  test(name, function(t) {
-    var file = exports.inputPath(name);
-    var input = yaml.loadFileSync(file, tags);
-
-    t.ok(_.isEqual(input, expected), 'load YAML', {
+  var input = yaml.loadFileSync(inputPath(t), tags);
+  t.ok(
+    _.isEqual(input, expected),
+    'load YAML and compare with JSON',
+    {
       input: util.inspect(input),
       expected: util.inspect(expected)
-    });
-    t.end();
-  });
+    }
+  );
 };
 
 
-// Dump JS to YAML, load again, and compare the two.
-exports.dumpAndLoad = function(name, input) {
-  test(name, function(t) {
-    var data = yaml.dump.apply(null, input);
-    var output = yaml.load(data);
-    t.ok(_.isEqual(input, output), 'dump & load YAML', {
+// Dump the JSON to YAML, load it back in, and compare with the original.
+var dumpAndLoad = function(t, input) {
+  var data = yaml.dump.apply(null, input),
+      output = yaml.load(data);
+  t.ok(
+    _.isEqual(input, output),
+    'dump, load, and compare with the original',
+    {
       inputJs: util.inspect(input),
       yaml: data,
       outputJs: util.inspect(output)
-    });
-    t.end();
-  });
+    }
+  );
 };

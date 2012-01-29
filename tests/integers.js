@@ -1,6 +1,6 @@
 var testutil = require('../testutil');
 
-testutil.withYamlAndJs('integers', [
+testutil.simple('integers', [
   {
     'canonical': 685230,
     'decimal': 685230,

@@ -1,6 +1,6 @@
 var testutil = require('../testutil');
 
-testutil.withYamlAndJs('sequences', [
+testutil.simple('sequences', [
   [1, 2, 3],
   [1, 2, 3]
 ]);

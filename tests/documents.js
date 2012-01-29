@@ -1,6 +1,6 @@
 var testutil = require('../testutil');
 
-testutil.withYamlAndJs('documents', [
+testutil.simple('documents', [
   ['a', 'b', 'c'],
   { first: 1, second: 2 },
   'test',

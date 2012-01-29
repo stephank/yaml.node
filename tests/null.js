@@ -1,6 +1,6 @@
 var testutil = require('../testutil');
 
-testutil.withYamlAndJs('null', [
+testutil.simple('null', [
   null,
   {
     'empty': null,

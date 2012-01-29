@@ -1,5 +1,5 @@
 var testutil = require('../testutil');
 
-testutil.withYamlAndJs('booleans', [
+testutil.simple('booleans', [
   [true, false, true, false, true, false]
 ]);

@@ -1,6 +1,6 @@
 var testutil = require('../testutil');
 
-testutil.withYamlAndJs('floats', [
+testutil.simple('floats', [
   {
     'canonical': 685230.15,
     'exponential': 685230.15,

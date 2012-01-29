@@ -1,6 +1,6 @@
 var testutil = require('../testutil');
 
-testutil.withYamlAndJs('datetime', [
+testutil.simple('datetime', [
   {
     'canonical':        new Date('2001-12-15T02:59:43.10Z'),
     'valid iso8601':    new Date('2001-12-14T21:59:43.10-05:00'),
