@@ -159,7 +159,15 @@ ParserErrorToJs(yaml_parser_t &parser)
 }
 
 
-// The workhorse.
+// Binding to LibYAML's stream parser. The function signature is:
+//
+//     yaml.parse(input, handler);
+//
+// Where `input` is a string, and `handler` an object.
+//
+// The handler object exposes methods for each LibYAML parser event. These are named `onScalar`,
+// `onSequenceStart`, etc. All of these methods take an event object that is similar in structure
+// to a flattened `yaml_event_t`.
 static Handle<Value>
 Parse(const Arguments &args)
 {
@@ -314,6 +322,21 @@ Parse(const Arguments &args)
 }
 
 
+// Binding to LibYAML's stream emitter. The usage is more or less the opposite of `parse`.
+// Instead of getting callbacks, the user makes the calls, for example:
+//
+//     var emitter = yaml.createEmitter();
+//     emitter.stream(function() {
+//       emitter.document(function() {
+//         emitter.scalar("foobar");
+//       });
+//     });
+//
+// YAML stream events are exposed as methods on the emitter. The `YAML_*_START_EVENT` and
+// `YAML_*_END_EVENT` types are exposed as single methods taking a function to wrap with
+// the start and end events.
+//
+// As libYAML produces output, an array `emitter.chunks` is appended to with strings.
 class Emitter : ObjectWrap
 {
 public:

@@ -110,9 +110,11 @@ var parseScalar = function(v) {
   return v;
 };
 
-// `parse` is the binding to LibYAML's parser. It's signature is:
+// Binding to LibYAML's stream parser. The function signature is:
 //
-//     function(input, handler) { [native] }
+//     yaml.parse(input, handler)
+//
+// Where `input` is a string, and `handler` an object.
 //
 // The handler object exposes methods for each LibYAML parser event. These are named `onScalar`,
 // `onSequenceStart`, etc. All of these methods take an event object that is similar in structure
@@ -238,6 +240,25 @@ require.extensions[".yaml"] = require.extensions[".yml"] = function (module) {
    module.exports = exports.loadFileSync(module.filename);
 };
 
+
+// Binding to LibYAML's stream emitter. The usage is more or less the opposite of `parse`.
+// Instead of getting callbacks, the user makes the calls, for example:
+//
+//     var emitter = yaml.createEmitter();
+//     emitter.stream(function() {
+//       emitter.document(function() {
+//         emitter.scalar("foobar");
+//       });
+//     });
+//
+// YAML stream events are exposed as methods on the emitter. The `YAML_*_START_EVENT` and
+// `YAML_*_END_EVENT` types are exposed as single methods taking a function to wrap with
+// the start and end events.
+//
+// As libYAML produces output, an array `emitter.chunks` is appended to with strings.
+exports.createEmitter = function() {
+  return new binding.Emitter();
+};
 
 // Helper function that emits a serialized version of the given item.
 var serialize = function(emitter, item) {
