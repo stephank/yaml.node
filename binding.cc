@@ -65,7 +65,7 @@ static Persistent<String> flow_symbol;
 
 // Convert from LibYAML's booleans.
 static inline Handle<Boolean>
-FromBoolean(int value)
+BoolToJs(int value)
 {
   return value ? True() : False();
 }
@@ -73,13 +73,13 @@ FromBoolean(int value)
 
 // Convert from LibYAML's strings.
 static inline Handle<Value>
-FromString(yaml_char_t *value)
+StringToJs(yaml_char_t *value)
 {
   return value ? String::New((const char *)value) : Null();
 }
 
 static inline Handle<Value>
-FromString(yaml_char_t *value, size_t length)
+StringToJs(yaml_char_t *value, size_t length)
 {
   return value ? String::New((const char *)value, (int)length) : Null();
 }
@@ -87,7 +87,7 @@ FromString(yaml_char_t *value, size_t length)
 
 // Create an object from LibYAML's mark.
 static inline Local<Object>
-FromMark(yaml_mark_t &mark)
+MarkToJs(yaml_mark_t &mark)
 {
   Local<Object> obj = Object::New();
   obj->Set(index_symbol,  Integer::NewFromUnsigned(mark.index));
@@ -97,9 +97,9 @@ FromMark(yaml_mark_t &mark)
 }
 
 
-// Create an V8 exception from a YAML error.
+// Create an Error from the libYAML parser state.
 static inline Local<Value>
-ExceptionFromParserError(yaml_parser_t &parser)
+ParserErrorToJs(yaml_parser_t &parser)
 {
   if (parser.error == YAML_MEMORY_ERROR)
     throw std::bad_alloc();
@@ -138,13 +138,13 @@ ExceptionFromParserError(yaml_parser_t &parser)
       error = Local<Object>::Cast(Exception::Error(problem));
 
       if (parser.context != NULL) {
-        mark = FromMark(parser.context_mark);
+        mark = MarkToJs(parser.context_mark);
         mark->Set(description_symbol, String::New(parser.context));
         error->Set(context_symbol, mark);
       }
 
       if (parser.problem != NULL) {
-        mark = FromMark(parser.problem_mark);
+        mark = MarkToJs(parser.problem_mark);
         mark->Set(description_symbol, String::New(parser.problem));
         error->Set(problem_symbol, mark);
       }
@@ -205,7 +205,7 @@ Parse(const Arguments &args)
   Local<Value> params[1];
   while (1) {
     if (yaml_parser_parse(&parser, &event) == 0)
-      return ThrowException(ExceptionFromParserError(parser));
+      return ThrowException(ParserErrorToJs(parser));
 
     // Find the right handler method.
     switch (event.type) {
@@ -227,8 +227,8 @@ Parse(const Arguments &args)
 
     // Create the event object.
     obj = Object::New();
-    obj->Set(start_symbol, FromMark(event.start_mark));
-    obj->Set(end_symbol,   FromMark(event.end_mark));
+    obj->Set(start_symbol, MarkToJs(event.start_mark));
+    obj->Set(end_symbol,   MarkToJs(event.end_mark));
 
     switch (event.type) {
       case YAML_DOCUMENT_START_EVENT:
@@ -240,23 +240,23 @@ Parse(const Arguments &args)
         }
         else
           obj->Set(version_symbol, Null());
-        obj->Set(implicit_symbol, FromBoolean(event.data.document_start.implicit));
+        obj->Set(implicit_symbol, BoolToJs(event.data.document_start.implicit));
         break;
 
       case YAML_DOCUMENT_END_EVENT:
-        obj->Set(implicit_symbol, FromBoolean(event.data.document_end.implicit));
+        obj->Set(implicit_symbol, BoolToJs(event.data.document_end.implicit));
         break;
 
       case YAML_ALIAS_EVENT:
-        obj->Set(anchor_symbol, FromString(event.data.alias.anchor));
+        obj->Set(anchor_symbol, StringToJs(event.data.alias.anchor));
         break;
 
       case YAML_SCALAR_EVENT:
-        obj->Set(anchor_symbol, FromString(event.data.scalar.anchor));
-        obj->Set(tag_symbol,    FromString(event.data.scalar.tag));
-        obj->Set(value_symbol,  FromString(event.data.scalar.value, event.data.scalar.length));
-        obj->Set(plain_implicit_symbol,  FromBoolean(event.data.scalar.plain_implicit));
-        obj->Set(quoted_implicit_symbol, FromBoolean(event.data.scalar.quoted_implicit));
+        obj->Set(anchor_symbol, StringToJs(event.data.scalar.anchor));
+        obj->Set(tag_symbol,    StringToJs(event.data.scalar.tag));
+        obj->Set(value_symbol,  StringToJs(event.data.scalar.value, event.data.scalar.length));
+        obj->Set(plain_implicit_symbol,  BoolToJs(event.data.scalar.plain_implicit));
+        obj->Set(quoted_implicit_symbol, BoolToJs(event.data.scalar.quoted_implicit));
         switch (event.data.scalar.style) {
           case YAML_PLAIN_SCALAR_STYLE:         obj->Set(style_symbol, plain_symbol);         break;
           case YAML_SINGLE_QUOTED_SCALAR_STYLE: obj->Set(style_symbol, single_quoted_symbol); break;
@@ -268,9 +268,9 @@ Parse(const Arguments &args)
         break;
 
       case YAML_SEQUENCE_START_EVENT:
-        obj->Set(anchor_symbol,    FromString(event.data.sequence_start.anchor));
-        obj->Set(tag_symbol,       FromString(event.data.sequence_start.tag));
-        obj->Set(implicit_symbol, FromBoolean(event.data.sequence_start.implicit));
+        obj->Set(anchor_symbol,    StringToJs(event.data.sequence_start.anchor));
+        obj->Set(tag_symbol,       StringToJs(event.data.sequence_start.tag));
+        obj->Set(implicit_symbol, BoolToJs(event.data.sequence_start.implicit));
         switch (event.data.sequence_start.style) {
           case YAML_BLOCK_SEQUENCE_STYLE: obj->Set(style_symbol, block_symbol); break;
           case YAML_FLOW_SEQUENCE_STYLE:  obj->Set(style_symbol, flow_symbol);  break;
@@ -279,9 +279,9 @@ Parse(const Arguments &args)
         break;
 
       case YAML_MAPPING_START_EVENT:
-        obj->Set(anchor_symbol,    FromString(event.data.mapping_start.anchor));
-        obj->Set(tag_symbol,       FromString(event.data.mapping_start.tag));
-        obj->Set(implicit_symbol, FromBoolean(event.data.mapping_start.implicit));
+        obj->Set(anchor_symbol,    StringToJs(event.data.mapping_start.anchor));
+        obj->Set(tag_symbol,       StringToJs(event.data.mapping_start.tag));
+        obj->Set(implicit_symbol, BoolToJs(event.data.mapping_start.implicit));
         switch (event.data.mapping_start.style) {
           case YAML_BLOCK_MAPPING_STYLE: obj->Set(style_symbol, block_symbol); break;
           case YAML_FLOW_MAPPING_STYLE:  obj->Set(style_symbol, flow_symbol);  break;
