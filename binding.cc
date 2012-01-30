@@ -198,6 +198,71 @@ EventToJs(yaml_event_t &event)
 }
 
 
+// Create a LibYAML event from an input object.
+static inline yaml_event_t *
+JsToEvent(Local<Object> &obj)
+{
+  yaml_event_t *event = new yaml_event_t;
+  event->type = YAML_NO_EVENT;
+
+  Local<Value> type = obj->Get(type_symbol);
+
+  if (type->StrictEquals(stream_start_symbol)) {
+    // FIXME: Detect endianness?
+    yaml_stream_start_event_initialize(event, YAML_ANY_ENCODING);
+  }
+
+  else if (type->StrictEquals(stream_end_symbol)) {
+    yaml_stream_end_event_initialize(event);
+  }
+
+  else if (type->StrictEquals(document_start_symbol)) {
+    yaml_document_start_event_initialize(event, NULL, NULL, NULL, 0);
+  }
+
+  else if (type->StrictEquals(document_end_symbol)) {
+    yaml_document_end_event_initialize(event, 0);
+  }
+
+  else if (type->StrictEquals(alias_symbol)) {
+    Local<Value> tmp = obj->Get(anchor_symbol);
+    if (!tmp->IsString()) goto end;
+    String::AsciiValue anchor(tmp->ToString());
+
+    yaml_alias_event_initialize(event, (yaml_char_t *)*anchor);
+  }
+
+  else if (type->StrictEquals(scalar_symbol)) {
+    Local<Value> tmp = obj->Get(value_symbol);
+    if (!tmp->IsString()) goto end;
+    String::AsciiValue value(tmp->ToString());
+
+    yaml_scalar_event_initialize(event, NULL, NULL,
+        (yaml_char_t *)*value, value.length(),
+        1, 1, YAML_ANY_SCALAR_STYLE);
+  }
+
+  else if (type->StrictEquals(sequence_start_symbol)) {
+    yaml_sequence_start_event_initialize(event, NULL, NULL, 0, YAML_ANY_SEQUENCE_STYLE);
+  }
+
+  else if (type->StrictEquals(sequence_end_symbol)) {
+    yaml_sequence_end_event_initialize(event);
+  }
+
+  else if (type->StrictEquals(mapping_start_symbol)) {
+    yaml_mapping_start_event_initialize(event, NULL, NULL, 0, YAML_ANY_MAPPING_STYLE);
+  }
+
+  else if (type->StrictEquals(mapping_end_symbol)) {
+    yaml_mapping_end_event_initialize(event);
+  }
+
+end:
+  return event;
+}
+
+
 // Create an Error from the LibYAML parser state.
 static inline Local<Value>
 ParserErrorToJs(yaml_parser_t &parser)
@@ -330,21 +395,12 @@ Parse(const Arguments &args)
 }
 
 
-// Binding to LibYAML's stream emitter. The usage is more or less the opposite of `parse`.
-// Instead of getting callbacks, the user makes the calls, for example:
+// Binding to LibYAML's stream emitter. The usage is more or less the opposite of `parse`:
 //
-//     var emitter = yaml.createEmitter();
-//     emitter.stream(function() {
-//       emitter.document(function() {
-//         emitter.scalar("foobar");
-//       });
-//     });
+//     var emitter = new Emitter(function(data) { /* ... */ };
+//     emitter.event({ type: 'streamStart' });
 //
-// YAML stream events are exposed as methods on the emitter. The `YAML_*_START_EVENT` and
-// `YAML_*_END_EVENT` types are exposed as single methods taking a function to wrap with
-// the start and end events.
-//
-// As libYAML produces output, an array `emitter.chunks` is appended to with strings.
+// The constructor takes a function called with output data as LibYAML provides it.
 class Emitter : ObjectWrap
 {
 public:
@@ -354,12 +410,7 @@ public:
     Local<FunctionTemplate> t = FunctionTemplate::New(New);
     t->InstanceTemplate()->SetInternalFieldCount(1);
 
-    NODE_SET_PROTOTYPE_METHOD(t, "stream", Stream);
-    NODE_SET_PROTOTYPE_METHOD(t, "document", Document);
-    NODE_SET_PROTOTYPE_METHOD(t, "sequence", Sequence);
-    NODE_SET_PROTOTYPE_METHOD(t, "mapping", Mapping);
-    NODE_SET_PROTOTYPE_METHOD(t, "alias", Alias);
-    NODE_SET_PROTOTYPE_METHOD(t, "scalar", Scalar);
+    NODE_SET_PROTOTYPE_METHOD(t, "event", Event);
 
     target->Set(String::NewSymbol("Emitter"), t->GetFunction());
   }
@@ -399,161 +450,20 @@ private:
     return e->handle_;
   }
 
-  static inline Emitter *
-  GetEmitter(const Arguments &args)
-  {
-    return ObjectWrap::Unwrap<Emitter>(args.This());
-  }
-
   static Handle<Value>
-  Stream(const Arguments &args)
+  Event(const Arguments &args)
   {
     if (args.Length() != 1)
         return ThrowException(Exception::TypeError(
             String::New("Expected one argument")));
-    if (!args[0]->IsFunction())
+    if (!args[0]->IsObject())
         return ThrowException(Exception::TypeError(
-            String::New("Expected a function")));
-    Local<Function> block = Local<Function>::Cast(args[0]);
+            String::New("Expected an object")));
+    Local<Object> obj = Local<Object>::Cast(args[0]);
 
-    Emitter *e = GetEmitter(args);
-    yaml_event_t *ev;
+    Emitter *e = ObjectWrap::Unwrap<Emitter>(args.This());
 
-    ev = new yaml_event_t;
-    yaml_stream_start_event_initialize(ev, YAML_ANY_ENCODING);
-    yaml_emitter_emit(&e->emitter_, ev);
-
-    block->Call(Context::GetCurrent()->Global(), 0, NULL);
-
-    ev = new yaml_event_t;
-    yaml_stream_end_event_initialize(ev);
-    yaml_emitter_emit(&e->emitter_, ev);
-
-    return Undefined();
-  }
-
-  static Handle<Value>
-  Document(const Arguments &args)
-  {
-    // FIXME: Event options.
-    if (args.Length() != 1)
-        return ThrowException(Exception::TypeError(
-            String::New("Expected one argument")));
-    if (!args[0]->IsFunction())
-        return ThrowException(Exception::TypeError(
-            String::New("Expected a function")));
-    Local<Function> block = Local<Function>::Cast(args[0]);
-
-    Emitter *e = GetEmitter(args);
-    yaml_event_t *ev;
-
-    ev = new yaml_event_t;
-    yaml_document_start_event_initialize(ev, NULL, NULL, NULL, 0);
-    yaml_emitter_emit(&e->emitter_, ev);
-
-    block->Call(Context::GetCurrent()->Global(), 0, NULL);
-
-    ev = new yaml_event_t;
-    yaml_document_end_event_initialize(ev, 0);
-    yaml_emitter_emit(&e->emitter_, ev);
-
-    return Undefined();
-  }
-
-  static Handle<Value>
-  Sequence(const Arguments &args)
-  {
-    // FIXME: Event options.
-    if (args.Length() != 1)
-        return ThrowException(Exception::TypeError(
-            String::New("Expected one argument")));
-    if (!args[0]->IsFunction())
-        return ThrowException(Exception::TypeError(
-            String::New("Expected a function")));
-    Local<Function> block = Local<Function>::Cast(args[0]);
-
-    Emitter *e = GetEmitter(args);
-    yaml_event_t *ev;
-
-    ev = new yaml_event_t;
-    yaml_sequence_start_event_initialize(ev, NULL, NULL, 0, YAML_ANY_SEQUENCE_STYLE);
-    yaml_emitter_emit(&e->emitter_, ev);
-
-    block->Call(Context::GetCurrent()->Global(), 0, NULL);
-
-    ev = new yaml_event_t;
-    yaml_sequence_end_event_initialize(ev);
-    yaml_emitter_emit(&e->emitter_, ev);
-
-    return Undefined();
-  }
-
-  static Handle<Value>
-  Mapping(const Arguments &args)
-  {
-    // FIXME: Event options.
-    if (args.Length() != 1)
-        return ThrowException(Exception::TypeError(
-            String::New("Expected one argument")));
-    if (!args[0]->IsFunction())
-        return ThrowException(Exception::TypeError(
-            String::New("Expected a function")));
-    Local<Function> block = Local<Function>::Cast(args[0]);
-
-    Emitter *e = GetEmitter(args);
-    yaml_event_t *ev;
-
-    ev = new yaml_event_t;
-    yaml_mapping_start_event_initialize(ev, NULL, NULL, 0, YAML_ANY_MAPPING_STYLE);
-    yaml_emitter_emit(&e->emitter_, ev);
-
-    block->Call(Context::GetCurrent()->Global(), 0, NULL);
-
-    ev = new yaml_event_t;
-    yaml_mapping_end_event_initialize(ev);
-    yaml_emitter_emit(&e->emitter_, ev);
-
-    return Undefined();
-  }
-
-  static Handle<Value>
-  Alias(const Arguments &args)
-  {
-    if (args.Length() != 1)
-        return ThrowException(Exception::TypeError(
-            String::New("Expected one argument")));
-    if (!args[0]->IsString())
-        return ThrowException(Exception::TypeError(
-            String::New("Expected a string")));
-    String::AsciiValue anchor(args[0]->ToString());
-
-    Emitter *e = GetEmitter(args);
-
-    yaml_event_t *ev = new yaml_event_t;
-    yaml_alias_event_initialize(ev, (yaml_char_t *)*anchor);
-    yaml_emitter_emit(&e->emitter_, ev);
-
-    return Undefined();
-  }
-
-  static Handle<Value>
-  Scalar(const Arguments &args)
-  {
-    // FIXME: Event options.
-    if (args.Length() != 1)
-        return ThrowException(Exception::TypeError(
-            String::New("Expected one argument")));
-    if (!args[0]->IsString())
-        return ThrowException(Exception::TypeError(
-            String::New("Expected a string")));
-    String::Utf8Value value(args[0]->ToString());
-
-    Emitter *e = GetEmitter(args);
-
-    yaml_event_t *ev = new yaml_event_t;
-    yaml_scalar_event_initialize(ev, NULL, NULL,
-        (yaml_char_t *)*value, value.length(),
-        1, 1, YAML_ANY_SCALAR_STYLE);
+    yaml_event_t *ev = JsToEvent(obj);
     yaml_emitter_emit(&e->emitter_, ev);
 
     return Undefined();

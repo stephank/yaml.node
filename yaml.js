@@ -2,15 +2,16 @@
 // MIT-licensed. (See the included LICENSE file.)
 
 var fs = require('fs'),
+    EventEmitter = require('events').EventEmitter,
     binding = exports.capi = require('./build/Release/binding');
 
 
 // Low-level YAML stream exports.
-exports.stream = {}
+exports.stream = {};
 
-// Parse a YAML stream and call back with events.
+// Create a raw event stream from YAML input.
 //
-//     yaml.stream.parse(input, handler);
+//     var output = yaml.stream.parse(input, handler);
 //
 // The handler can be an object that exposes methods for each LibYAML parser event. These are
 // named `onScalar`, `onSequenceStart`, etc. All of these methods take an event object that is
@@ -29,6 +30,66 @@ exports.stream.parse = function(input, handler) {
   }
 
   binding.parse(input, handler);
+};
+
+// Create a YAML data stream from raw events.
+//
+//     var emitter = yaml.stream.createEmitter(function(data) { /* ... */ });
+//     emitter.stream(function() {
+//       emitter.document(function() {
+//         emitter.scalar("foobar");
+//       });
+//     });
+//
+// YAML stream events are exposed as methods on the emitter, e.g. 'streamStart', 'scalar', etc.
+// Additionally, events that come in start/end pairs are exposed as single methods taking a
+// function to wrap with the start and end events.
+//
+// As libYAML produces output, `data` events are emitted. The `createEmitter` factory can take
+// a function argument which is immediately installed as a `data` event listener.
+var YamlStreamEmitter = function() {
+  var callback = this.emit.bind(this, 'data');
+  this.emitter_ = new binding.Emitter(callback);
+};
+YamlStreamEmitter.prototype = new EventEmitter();
+
+YamlStreamEmitter.event = function(obj) {
+  if (typeof(obj) === 'string')
+    obj = { type: obj };
+  this.emitter_.event(obj);
+};
+
+['stream', 'document', 'sequence', 'mapping'].forEach(function(pre) {
+  var startEvent = pre + 'Start';
+  YamlStreamEmitter.prototype[startEvent] = function() {
+    this.emitter_.event({ type: startEvent });
+  };
+
+  var endEvent = pre + 'End';
+  YamlStreamEmitter.prototype[endEvent] = function() {
+    this.emitter_.event({ type: endEvent });
+  };
+
+  YamlStreamEmitter.prototype[pre] = function(block) {
+    this.emitter_.event({ type: startEvent });
+    var result = block();
+    this.emitter_.event({ type: endEvent });
+    return result;
+  };
+});
+
+YamlStreamEmitter.prototype.alias = function(anchor) {
+  this.emitter_.event({ type: 'alias', anchor: anchor });
+};
+
+YamlStreamEmitter.prototype.scalar = function(value) {
+  this.emitter_.event({ type: 'scalar', value: value });
+};
+
+exports.stream.createEmitter = function(handler) {
+  var result = new YamlStreamEmitter();
+  if (handler) result.on('data', handler);
+  return result;
 };
 
 
@@ -258,25 +319,6 @@ require.extensions[".yaml"] = require.extensions[".yml"] = function (module) {
 };
 
 
-// Binding to LibYAML's stream emitter. The usage is more or less the opposite of `parse`.
-// Instead of getting callbacks, the user makes the calls, for example:
-//
-//     var emitter = yaml.createEmitter();
-//     emitter.stream(function() {
-//       emitter.document(function() {
-//         emitter.scalar("foobar");
-//       });
-//     });
-//
-// YAML stream events are exposed as methods on the emitter. The `YAML_*_START_EVENT` and
-// `YAML_*_END_EVENT` types are exposed as single methods taking a function to wrap with
-// the start and end events.
-//
-// As libYAML produces output, an array `emitter.chunks` is appended to with strings.
-exports.createEmitter = function() {
-  return new binding.Emitter();
-};
-
 // Helper function that emits a serialized version of the given item.
 var serialize = function(emitter, item) {
   // FIXME: throw on circulars
@@ -330,7 +372,7 @@ var serialize = function(emitter, item) {
 // treated as a single document to serialize. The return value is a string.
 exports.dump = function() {
   var documents = arguments, chunks = [], emitter;
-  emitter = new binding.Emitter(function(chunk) {
+  emitter = new exports.stream.createEmitter(function(chunk) {
     chunks.push(chunk);
   });
   emitter.stream(function() {
