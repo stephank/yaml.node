@@ -53,7 +53,7 @@ var YamlStreamEmitter = function() {
 };
 YamlStreamEmitter.prototype = new EventEmitter();
 
-YamlStreamEmitter.event = function(obj) {
+YamlStreamEmitter.prototype.event = function(obj) {
   if (typeof(obj) === 'string')
     obj = { type: obj };
   this.emitter_.event(obj);
