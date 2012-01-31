@@ -2,7 +2,8 @@
 // MIT-licensed. (See the included LICENSE file.)
 
 var fs = require('fs'),
-    EventEmitter = require('events').EventEmitter,
+    util = require('util'),
+    events = require('events'),
     binding = require('./build/Release/binding');
 
 
@@ -51,7 +52,7 @@ var YamlStreamEmitter = function() {
   var callback = this.emit.bind(this, 'data');
   this.emitter_ = new binding.Emitter(callback);
 };
-YamlStreamEmitter.prototype = new EventEmitter();
+util.inherits(YamlStreamEmitter, events.EventEmitter);
 
 YamlStreamEmitter.prototype.event = function(obj) {
   if (typeof(obj) === 'string')
