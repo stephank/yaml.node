@@ -5,9 +5,9 @@ var test = require('tap').test;
 var yaml = require('./yaml');
 
 
-// Helper that, given a Test, returns the path to the YAML input file.
-var inputPath = exports.inputPath = function(t) {
-  return path.resolve(module.filename, '..', 'tests', t.conf.name + '.yaml');
+// Helper that, given a test name, returns the path to the YAML input file.
+var inputPath = exports.inputPath = function(name) {
+  return path.resolve(module.filename, '..', 'tests', name + '.yaml');
 };
 
 
@@ -30,7 +30,7 @@ var load = function(t, tags, expected) {
     tags = undefined;
   }
 
-  var input = yaml.loadFileSync(inputPath(t), tags);
+  var input = yaml.loadFileSync(inputPath(t.conf.name), tags);
   t.ok(
     _.isEqual(input, expected),
     'load YAML and compare with JSON',

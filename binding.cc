@@ -325,6 +325,20 @@ ParserErrorToJs(yaml_parser_t &parser)
 }
 
 
+// Create an Error from the LibYAML emitter state.
+static inline Local<Value>
+EmitterErrorToJs(yaml_emitter_t &emitter)
+{
+  if (emitter.error == YAML_MEMORY_ERROR)
+    throw std::bad_alloc();
+
+  if (emitter.error == YAML_EMITTER_ERROR)
+    return Exception::Error(String::New(emitter.problem));
+  else
+    return Exception::Error(String::New("Unknown error"));
+}
+
+
 // Binding to LibYAML's stream parser. The function signature is:
 //
 //     parse(input, handler);
@@ -464,7 +478,8 @@ private:
     Emitter *e = ObjectWrap::Unwrap<Emitter>(args.This());
 
     yaml_event_t *ev = JsToEvent(obj);
-    yaml_emitter_emit(&e->emitter_, ev);
+    if (yaml_emitter_emit(&e->emitter_, ev) == 0)
+      return ThrowException(EmitterErrorToJs(e->emitter_));
 
     return Undefined();
   }
