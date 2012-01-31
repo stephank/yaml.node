@@ -3,7 +3,7 @@
 
 var fs = require('fs'),
     EventEmitter = require('events').EventEmitter,
-    binding = exports.capi = require('./build/Release/binding');
+    binding = require('./build/Release/binding');
 
 
 // Low-level YAML stream exports.
