@@ -2,7 +2,7 @@ var path = require('path');
 var util = require('util');
 var _ = require('underscore');
 var test = require('tap').test;
-var yaml = require('./yaml');
+var Yaml = require('./yaml');
 
 
 // Helper that, given a test name, returns the path to the YAML input file.
@@ -30,7 +30,7 @@ var load = function(t, tags, expected) {
     tags = undefined;
   }
 
-  var input = yaml.loadFileSync(inputPath(t.conf.name), tags);
+  var input = Yaml.readFileSync(inputPath(t.conf.name), tags);
   t.ok(
     _.isEqual(input, expected),
     'load YAML and compare with JSON',
@@ -44,8 +44,8 @@ var load = function(t, tags, expected) {
 
 // Dump the JSON to YAML, load it back in, and compare with the original.
 var dumpAndLoad = function(t, input) {
-  var data = yaml.dump.apply(null, input),
-      output = yaml.load(data);
+  var data = Yaml.stringify.apply(null, input),
+      output = Yaml.parse(data);
   t.ok(
     _.isEqual(input, output),
     'dump, load, and compare with the original',

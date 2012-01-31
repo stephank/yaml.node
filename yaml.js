@@ -209,7 +209,7 @@ var parseScalar = function(v) {
 
 // The `load` function reads all documents from the given string input. The return value is an
 // array of documents found represented as plain JavaScript objects, arrays and primitives.
-exports.load = function(input, tagHandlers) {
+exports.parse = function(input, tagHandlers) {
   if (typeof tagHandlers !== 'object')
     tagHandlers = {};
 
@@ -303,7 +303,7 @@ exports.load = function(input, tagHandlers) {
 };
 
 // Helper for quickly reading in a file.
-exports.loadFile = function(filename, tagHandlers, callback) {
+exports.readFile = function(filename, tagHandlers, callback) {
   if (typeof tagHandlers === 'function') {
     callback = tagHandlers;
     tagHandlers = {};
@@ -311,19 +311,19 @@ exports.loadFile = function(filename, tagHandlers, callback) {
 
   fs.readFile(filename, 'utf-8', function(err, data) {
     if (err) callback(err, null);
-    else callback(null, exports.load(data, tagHandlers));
+    else callback(null, exports.parse(data, tagHandlers));
   });
 };
 
 // Synchronous version of loadFile.
-exports.loadFileSync = function(filename, tagHandlers) {
+exports.readFileSync = function(filename, tagHandlers) {
   var data = fs.readFileSync(filename, 'utf-8');
-  return exports.load(data, tagHandlers);
+  return exports.parse(data, tagHandlers);
 };
 
 // Allow direct requiring of YAML files.
 require.extensions[".yaml"] = require.extensions[".yml"] = function (module) {
-   module.exports = exports.loadFileSync(module.filename);
+   module.exports = exports.readFileSync(module.filename);
 };
 
 
@@ -382,7 +382,7 @@ var serialize = function(emitter, item) {
 // The `dump` function serializes its arguments to YAML. Any number of arguments may be provided,
 // and the arguments should be plain JavaScript objects, arrays or primitives. Each argument is
 // treated as a single document to serialize. The return value is a string.
-exports.dump = function() {
+exports.stringify = function() {
   var documents = arguments, chunks = [], emitter;
   emitter = new exports.stream.createEmitter(function(chunk) {
     chunks.push(chunk);
@@ -400,21 +400,21 @@ exports.dump = function() {
 };
 
 // Helper for quickly writing out a file.
-exports.dumpFile = function(filename) {
+exports.writeFile = function(filename) {
   var documents = Array.prototype.slice.call(arguments, 1),
       numDocuments = documents.length,
       callback;
   if (numDocuments !== 0 && typeof documents[numDocuments - 1] === 'function')
     callback = documents.pop();
 
-  var data = exports.dump.apply(this, documents);
+  var data = exports.stringify.apply(this, documents);
   fs.writeFile(filename, data, callback);
 };
 
 // Synchronous version of dumpFile.
-exports.dumpFileSync = function(filename) {
+exports.writeFileSync = function(filename) {
   var documents = Array.prototype.slice.call(arguments, 1);
 
-  var data = exports.dump.apply(this, documents);
+  var data = exports.stringify.apply(this, documents);
   fs.writeFileSync(filename, data);
 };

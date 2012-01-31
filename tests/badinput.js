@@ -1,12 +1,12 @@
 var test = require('tap').test;
 var testutil = require('../testutil');
-var yaml = require('../yaml');
+var Yaml = require('../yaml');
 
 test('bad parser input', function(t) {
   t.plan(1);
 
   t.throws(function() {
-    yaml.loadFileSync(testutil.inputPath('badinput'));
+    Yaml.readFileSync(testutil.inputPath('badinput'));
   }, {
     name: "Error",
     message: "did not find expected key, while parsing a block mapping, on line 2"
@@ -16,7 +16,7 @@ test('bad parser input', function(t) {
 test('bad emitter input', function(t) {
   t.plan(1);
 
-  var e = yaml.stream.createEmitter();
+  var e = Yaml.stream.createEmitter();
   t.throws(function() {
     e.streamStart();
     e.documentStart();
