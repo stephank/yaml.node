@@ -30,6 +30,22 @@ Including synchronous variants:
     var documents = YAML.readFileSync('myfile.yml');
     YAML.writeFileSync('myfile.yml', doc1, doc2);
 
+### Upgrading
+
+As of 0.1.0, the API immitates the JavaScript built-in `JSON` parser for string handling, and the
+Node.js built-in `fs`-module for file I/O. Function names have changed as follows:
+
+    YAML.load ➞ YAML.parse
+    YAML.dump ➞ YAML.stringify
+
+    YAML.loadFile ➞ YAML.readFile
+    YAML.dumpFile ➞ YAML.writeFile
+
+    YAML.loadFileSync ➞ YAML.readFileSync
+    YAML.dumpFileSync ➞ YAML.writeFileSync
+
+    YAML.parse ➞ YAML.stream.parse
+
 ### Hacking the code
 
     git clone https://github.com/stephank/yaml.node.git
