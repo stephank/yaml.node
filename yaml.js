@@ -1,10 +1,10 @@
 // YAML.node, © 2011 Stéphan Kochen
 // MIT-licensed. (See the included LICENSE file.)
 
-var fs = require('fs'),
-    util = require('util'),
-    events = require('events'),
-    binding = require('./build/Release/binding');
+var fs = require('fs');
+var util = require('util');
+var events = require('events');
+var binding = require('./build/Release/binding');
 
 
 //
