@@ -1,7 +1,7 @@
 var fs = require('fs');
 var _ = require('underscore');
 var test = require('tap').test;
-var Yaml = require('../yaml');
+var YAML = require('../yaml');
 
 test('basic stream parse tests', function(t) {
   var expectedTypes = ['streamStart', 'documentStart', 'scalar', 'documentEnd', 'streamEnd'];
@@ -14,10 +14,10 @@ test('basic stream parse tests', function(t) {
   };
 
   pos = 0;
-  Yaml.stream.parse('foo', handler);
+  YAML.stream.parse('foo', handler);
 
   pos = 0;
-  Yaml.stream.parse('foo', {
+  YAML.stream.parse('foo', {
     onStreamStart: handler,
     onDocumentStart: handler,
     onScalar: handler,
@@ -38,7 +38,7 @@ test('basic stream emit tests', function(t) {
   };
 
   data = '';
-  e = Yaml.stream.createEmitter(handler);
+  e = YAML.stream.createEmitter(handler);
   e.event({ type: 'streamStart' });
   e.event({ type: 'documentStart' });
   e.event({ type: 'scalar', value: 'foo' });
@@ -47,7 +47,7 @@ test('basic stream emit tests', function(t) {
   t.equal(data, expected);
 
   data = '';
-  e = Yaml.stream.createEmitter(handler);
+  e = YAML.stream.createEmitter(handler);
   e.streamStart();
   e.documentStart();
   e.scalar('foo');
@@ -62,7 +62,7 @@ test('basic parse test', function(t) {
   var input = 'foo';
   var expected = ['foo'];
 
-  var result = Yaml.parse(input);
+  var result = YAML.parse(input);
   t.ok(_.isEqual(result, expected), 'should be equal', {
     found: result,
     wanted: expected
@@ -75,7 +75,7 @@ test('basic stringify test', function(t) {
   var input = 'foo';
   var expected = '--- foo\n...\n';
 
-  var result = Yaml.stringify(input);
+  var result = YAML.stringify(input);
   t.ok(_.isEqual(result, expected), 'should be equal', {
     found: result,
     wanted: expected
@@ -88,8 +88,8 @@ test('basic sync file I/O tests', function(t) {
   var file = '/tmp/yaml.node-sync-test.yml';
   var input = 'foo';
 
-  Yaml.writeFileSync(file, input);
-  var result = Yaml.readFileSync(file);
+  YAML.writeFileSync(file, input);
+  var result = YAML.readFileSync(file);
   fs.unlinkSync(file);
 
   t.ok(_.isEqual(result, [input]), 'should be equal', {
@@ -104,8 +104,8 @@ test('basic async file I/O tests', function(t) {
   var file = '/tmp/yaml.node-async-test.yml';
   var input = 'foo';
 
-  Yaml.writeFile(file, input, function(error) {
-    Yaml.readFile(file, function(error, result) {
+  YAML.writeFile(file, input, function(error) {
+    YAML.readFile(file, function(error, result) {
       fs.unlinkSync(file);
 
       t.ok(_.isEqual(result, [input]), 'should be equal', {

@@ -6,12 +6,14 @@ var util = require('util');
 var events = require('events');
 var binding = require('./build/Release/binding');
 
+var YAML = exports;
+
 
 //
 // ----- Low-level YAML stream functions -----
 //
 
-exports.stream = {};
+YAML.stream = {};
 
 // Create a raw event stream from YAML input.
 //
@@ -22,7 +24,7 @@ exports.stream = {};
 // similar in structure to a flattened `yaml_event_t`.
 //
 // Alternatively, a single function can be passed in to handle all events.
-exports.stream.parse = function(input, handler) {
+YAML.stream.parse = function(input, handler) {
   if (typeof(handler) !== 'function') {
     var orig = handler;
     handler = function(event) {
@@ -51,13 +53,13 @@ exports.stream.parse = function(input, handler) {
 //
 // As libYAML produces output, `data` events are emitted. The `createEmitter` factory can take
 // a function argument which is immediately installed as a `data` event listener.
-var YamlStreamEmitter = function() {
+var YAMLStreamEmitter = function() {
   var callback = this.emit.bind(this, 'data');
   this.emitter_ = new binding.Emitter(callback);
 };
-util.inherits(YamlStreamEmitter, events.EventEmitter);
+util.inherits(YAMLStreamEmitter, events.EventEmitter);
 
-YamlStreamEmitter.prototype.event = function(obj) {
+YAMLStreamEmitter.prototype.event = function(obj) {
   if (typeof(obj) === 'string')
     obj = { type: obj };
   this.emitter_.event(obj);
@@ -65,16 +67,16 @@ YamlStreamEmitter.prototype.event = function(obj) {
 
 ['stream', 'document', 'sequence', 'mapping'].forEach(function(pre) {
   var startEvent = pre + 'Start';
-  YamlStreamEmitter.prototype[startEvent] = function() {
+  YAMLStreamEmitter.prototype[startEvent] = function() {
     this.emitter_.event({ type: startEvent });
   };
 
   var endEvent = pre + 'End';
-  YamlStreamEmitter.prototype[endEvent] = function() {
+  YAMLStreamEmitter.prototype[endEvent] = function() {
     this.emitter_.event({ type: endEvent });
   };
 
-  YamlStreamEmitter.prototype[pre] = function(block) {
+  YAMLStreamEmitter.prototype[pre] = function(block) {
     this.emitter_.event({ type: startEvent });
     var result = block();
     this.emitter_.event({ type: endEvent });
@@ -82,16 +84,16 @@ YamlStreamEmitter.prototype.event = function(obj) {
   };
 });
 
-YamlStreamEmitter.prototype.alias = function(anchor) {
+YAMLStreamEmitter.prototype.alias = function(anchor) {
   this.emitter_.event({ type: 'alias', anchor: anchor });
 };
 
-YamlStreamEmitter.prototype.scalar = function(value) {
+YAMLStreamEmitter.prototype.scalar = function(value) {
   this.emitter_.event({ type: 'scalar', value: value });
 };
 
-exports.stream.createEmitter = function(handler) {
-  var result = new YamlStreamEmitter();
+YAML.stream.createEmitter = function(handler) {
+  var result = new YAMLStreamEmitter();
   if (handler) result.on('data', handler);
   return result;
 };
@@ -209,7 +211,7 @@ var parseScalar = function(v) {
 
 // The `load` function reads all documents from the given string input. The return value is an
 // array of documents found represented as plain JavaScript objects, arrays and primitives.
-exports.parse = function(input, tagHandlers) {
+YAML.parse = function(input, tagHandlers) {
   if (typeof tagHandlers !== 'object')
     tagHandlers = {};
 
@@ -244,7 +246,7 @@ exports.parse = function(input, tagHandlers) {
 
   // Call into the parser and build the documents.
   var documents = [];
-  exports.stream.parse(input, parserHandler = {
+  YAML.stream.parse(input, parserHandler = {
     onDocumentEnd: null,
     onDocumentStart: function(e) {
       var document;
@@ -303,7 +305,7 @@ exports.parse = function(input, tagHandlers) {
 };
 
 // Helper for quickly reading in a file.
-exports.readFile = function(filename, tagHandlers, callback) {
+YAML.readFile = function(filename, tagHandlers, callback) {
   if (typeof tagHandlers === 'function') {
     callback = tagHandlers;
     tagHandlers = {};
@@ -311,19 +313,19 @@ exports.readFile = function(filename, tagHandlers, callback) {
 
   fs.readFile(filename, 'utf-8', function(err, data) {
     if (err) callback(err, null);
-    else callback(null, exports.parse(data, tagHandlers));
+    else callback(null, YAML.parse(data, tagHandlers));
   });
 };
 
 // Synchronous version of loadFile.
-exports.readFileSync = function(filename, tagHandlers) {
+YAML.readFileSync = function(filename, tagHandlers) {
   var data = fs.readFileSync(filename, 'utf-8');
-  return exports.parse(data, tagHandlers);
+  return YAML.parse(data, tagHandlers);
 };
 
 // Allow direct requiring of YAML files.
 require.extensions[".yaml"] = require.extensions[".yml"] = function (module) {
-   module.exports = exports.readFileSync(module.filename);
+   module.YAML = YAML.readFileSync(module.filename);
 };
 
 
@@ -382,9 +384,9 @@ var serialize = function(emitter, item) {
 // The `dump` function serializes its arguments to YAML. Any number of arguments may be provided,
 // and the arguments should be plain JavaScript objects, arrays or primitives. Each argument is
 // treated as a single document to serialize. The return value is a string.
-exports.stringify = function() {
+YAML.stringify = function() {
   var documents = arguments, chunks = [], emitter;
-  emitter = new exports.stream.createEmitter(function(chunk) {
+  emitter = new YAML.stream.createEmitter(function(chunk) {
     chunks.push(chunk);
   });
   emitter.stream(function() {
@@ -400,21 +402,21 @@ exports.stringify = function() {
 };
 
 // Helper for quickly writing out a file.
-exports.writeFile = function(filename) {
+YAML.writeFile = function(filename) {
   var documents = Array.prototype.slice.call(arguments, 1),
       numDocuments = documents.length,
       callback;
   if (numDocuments !== 0 && typeof documents[numDocuments - 1] === 'function')
     callback = documents.pop();
 
-  var data = exports.stringify.apply(this, documents);
+  var data = YAML.stringify.apply(this, documents);
   fs.writeFile(filename, data, callback);
 };
 
 // Synchronous version of dumpFile.
-exports.writeFileSync = function(filename) {
+YAML.writeFileSync = function(filename) {
   var documents = Array.prototype.slice.call(arguments, 1);
 
-  var data = exports.stringify.apply(this, documents);
+  var data = YAML.stringify.apply(this, documents);
   fs.writeFileSync(filename, data);
 };
