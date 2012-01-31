@@ -7,7 +7,10 @@ var fs = require('fs'),
     binding = require('./build/Release/binding');
 
 
-// Low-level YAML stream exports.
+//
+// ----- Low-level YAML stream functions -----
+//
+
 exports.stream = {};
 
 // Create a raw event stream from YAML input.
@@ -93,6 +96,10 @@ exports.stream.createEmitter = function(handler) {
   return result;
 };
 
+
+//
+// ----- YAML reading functions -----
+//
 
 // Most of these were derived from: http://yaml.org/type/
 // Also borrows from tenderlove's `Psych::ScalarScanner`. (MIT-licensed)
@@ -319,6 +326,10 @@ require.extensions[".yaml"] = require.extensions[".yml"] = function (module) {
    module.exports = exports.loadFileSync(module.filename);
 };
 
+
+//
+// ----- YAML writing functions -----
+//
 
 // Helper function that emits a serialized version of the given item.
 var serialize = function(emitter, item) {
