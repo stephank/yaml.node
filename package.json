@@ -1,6 +1,6 @@
 {
   "name": "libyaml",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Bindings to libYAML",
 
   "homepage": "http://github.com/stephank/yaml.node",
