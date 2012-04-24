@@ -115,3 +115,20 @@ test('basic async file I/O tests', function(t) {
     });
   });
 });
+
+test('require() hook test', function(t) {
+  t.plan(1);
+
+  var file = '/tmp/yaml.node-async-test.yml';
+  var input = 'foo';
+
+  YAML.writeFile(file, input, function(error) {
+    var result = require(file);
+    fs.unlinkSync(file);
+
+    t.ok(_.isEqual(result, [input]), 'should be equal', {
+      found: result,
+      wanted: [input]
+    });
+  });
+});

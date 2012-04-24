@@ -325,7 +325,7 @@ YAML.readFileSync = function(filename, tagHandlers) {
 
 // Allow direct requiring of YAML files.
 require.extensions[".yaml"] = require.extensions[".yml"] = function (module) {
-   module.YAML = YAML.readFileSync(module.filename);
+   module.exports = YAML.readFileSync(module.filename);
 };
 
 
