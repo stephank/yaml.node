@@ -1,4 +1,4 @@
-// YAML.node, © 2011 Stéphan Kochen
+// YAML.node, © 2012 Stéphan Kochen
 // MIT-licensed. (See the included LICENSE file.)
 
 var fs = require('fs');
