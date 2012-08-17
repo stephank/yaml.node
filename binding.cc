@@ -343,7 +343,7 @@ EmitterErrorToJs(yaml_emitter_t &emitter)
 //
 //     parse(input, handler);
 //
-// Where `input` is a string, and `handler` is a function receiving event objects.
+// Where `input` is a string, and `handler` is a function receiving events.
 static Handle<Value>
 Parse(const Arguments &args)
 {
@@ -351,11 +351,14 @@ Parse(const Arguments &args)
 
   // Check arguments.
   if (args.Length() != 2)
-    return ThrowException(Exception::Error(String::New("Two arguments were expected.")));
+    return ThrowException(Exception::Error(
+        String::New("Two arguments were expected.")));
   if (!args[0]->IsString())
-    return ThrowException(Exception::TypeError(String::New("Input must be a string.")));
+    return ThrowException(Exception::TypeError(
+        String::New("Input must be a string.")));
   if (!args[1]->IsFunction())
-    return ThrowException(Exception::TypeError(String::New("Handler must be a function.")));
+    return ThrowException(Exception::TypeError(
+        String::New("Handler must be a function.")));
 
   // Dereference arguments.
   String::Value value(args[0]);
@@ -452,11 +455,11 @@ private:
   New(const Arguments &args)
   {
     if (args.Length() != 1)
-        return ThrowException(Exception::TypeError(
-            String::New("Expected one argument")));
+      return ThrowException(Exception::TypeError(
+          String::New("Expected one argument")));
     if (!args[0]->IsFunction())
-        return ThrowException(Exception::TypeError(
-            String::New("Expected a function")));
+      return ThrowException(Exception::TypeError(
+          String::New("Expected a function")));
     Local<Function> writeCallback = Local<Function>::Cast(args[0]);
 
     Emitter *e = new Emitter(writeCallback);
@@ -468,11 +471,11 @@ private:
   Event(const Arguments &args)
   {
     if (args.Length() != 1)
-        return ThrowException(Exception::TypeError(
-            String::New("Expected one argument")));
+      return ThrowException(Exception::TypeError(
+          String::New("Expected one argument")));
     if (!args[0]->IsObject())
-        return ThrowException(Exception::TypeError(
-            String::New("Expected an object")));
+      return ThrowException(Exception::TypeError(
+          String::New("Expected an object")));
     Local<Object> obj = Local<Object>::Cast(args[0]);
 
     Emitter *e = ObjectWrap::Unwrap<Emitter>(args.This());
