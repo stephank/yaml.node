@@ -1,6 +1,8 @@
-**YAML.node** is a simple binding for LibYAML. [![Build Status](https://secure.travis-ci.org/stephank/yaml.node.png)](http://travis-ci.org/stephank/yaml.node)
+## YAML.node [![Build Status](https://secure.travis-ci.org/stephank/yaml.node.png)](http://travis-ci.org/stephank/yaml.node)
 
-Make sure you're on Node.js 0.4 or 0.6, and have LibYAML headers installed. Then simply:
+A simple binding for LibYAML.
+
+### Installing
 
     $ npm install libyaml
 
@@ -30,7 +32,14 @@ Including synchronous variants:
     var documents = YAML.readFileSync('myfile.yml');
     YAML.writeFileSync('myfile.yml', doc1, doc2);
 
-### Upgrading
+### Hacking the code
+
+    git clone https://github.com/stephank/yaml.node.git
+    cd yaml.node
+    npm install
+    npm test
+
+### Upgrading from pre-0.1.0
 
 As of 0.1.0, the API immitates the JavaScript built-in `JSON` parser for string handling, and the
 Node.js built-in `fs`-module for file I/O. Function names have changed as follows:
@@ -45,10 +54,3 @@ Node.js built-in `fs`-module for file I/O. Function names have changed as follow
     YAML.dumpFileSync ➞ YAML.writeFileSync
 
     YAML.parse ➞ YAML.stream.parse
-
-### Hacking the code
-
-    git clone https://github.com/stephank/yaml.node.git
-    cd yaml.node
-    npm install
-    npm test
