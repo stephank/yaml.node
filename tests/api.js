@@ -1,7 +1,7 @@
 var fs = require('fs');
 var _ = require('underscore');
 var test = require('tap').test;
-var YAML = require('../yaml');
+var YAML = require('../');
 
 test('basic stream parse tests', function(t) {
   var expectedTypes = ['streamStart', 'documentStart', 'scalar', 'documentEnd', 'streamEnd'];

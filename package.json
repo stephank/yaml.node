@@ -27,5 +27,5 @@
     "test": "tap ./tests/*.js"
   },
 
-  "main": "./yaml.js"
+  "main": "./index.js"
 }

@@ -2,7 +2,7 @@ var path = require('path');
 var util = require('util');
 var _ = require('underscore');
 var test = require('tap').test;
-var YAML = require('./yaml');
+var YAML = require('./');
 
 
 // Helper that, given a test name, returns the path to the YAML input file.

@@ -1,6 +1,6 @@
 var test = require('tap').test;
 var testutil = require('../testutil');
-var YAML = require('../yaml');
+var YAML = require('../');
 
 test('bad parser input', function(t) {
   t.plan(1);
