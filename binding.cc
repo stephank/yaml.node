@@ -4,7 +4,6 @@
 #include <v8.h>
 #include <node.h>
 #include <yaml.h>
-#include <stdexcept>
 
 using namespace v8;
 using namespace node;
@@ -267,9 +266,6 @@ end:
 static inline Local<Value>
 ParserErrorToJs(yaml_parser_t &parser)
 {
-  if (parser.error == YAML_MEMORY_ERROR)
-    throw std::bad_alloc();
-
   Local<String> problem = String::New(
       parser.problem ? parser.problem : "Unknown error");
 
@@ -329,9 +325,6 @@ ParserErrorToJs(yaml_parser_t &parser)
 static inline Local<Value>
 EmitterErrorToJs(yaml_emitter_t &emitter)
 {
-  if (emitter.error == YAML_MEMORY_ERROR)
-    throw std::bad_alloc();
-
   if (emitter.error == YAML_EMITTER_ERROR)
     return Exception::Error(String::New(emitter.problem));
   else
@@ -379,7 +372,8 @@ Parse(const Arguments &args)
   // Initialize parser.
   yaml_parser_t parser;
   if (!yaml_parser_initialize(&parser))
-    throw std::bad_alloc();
+    return ThrowException(Exception::Error(
+        String::New("Could not initiaize libYAML")));
   // FIXME: Detect endianness?
   yaml_parser_set_encoding(&parser, YAML_UTF16LE_ENCODING);
   yaml_parser_set_input_string(&parser, string, size);
@@ -440,16 +434,7 @@ public:
   }
 
 private:
-  Emitter(Handle<Function> writeCallback)
-  {
-    if (!yaml_emitter_initialize(&emitter_))
-      throw std::bad_alloc();
-    // FIXME: Detect endianness?
-    yaml_emitter_set_encoding(&emitter_, YAML_UTF16LE_ENCODING);
-    yaml_emitter_set_output(&emitter_, WriteHandler, this);
-
-    writeCallback_ = Persistent<Function>::New(writeCallback);
-  }
+  Emitter() {}
 
   static Handle<Value>
   New(const Arguments &args)
@@ -460,9 +445,19 @@ private:
     if (!args[0]->IsFunction())
       return ThrowException(Exception::TypeError(
           String::New("Expected a function")));
-    Local<Function> writeCallback = Local<Function>::Cast(args[0]);
 
-    Emitter *e = new Emitter(writeCallback);
+    Emitter *e = new Emitter();
+
+    if (!yaml_emitter_initialize(&e->emitter_))
+      return ThrowException(Exception::Error(
+          String::New("Could not initiaize libYAML")));
+    // FIXME: Detect endianness?
+    yaml_emitter_set_encoding(&e->emitter_, YAML_UTF16LE_ENCODING);
+    yaml_emitter_set_output(&e->emitter_, WriteHandler, e);
+
+    e->writeCallback_ = Persistent<Function>::New(
+        Handle<Function>::Cast(args[0]));
+
     e->Wrap(args.This());
     return e->handle_;
   }
