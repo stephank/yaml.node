@@ -312,8 +312,21 @@ YAML.readFile = function(filename, tagHandlers, callback) {
   }
 
   fs.readFile(filename, 'utf-8', function(err, data) {
-    if (err) callback(err, null);
-    else callback(null, YAML.parse(data, tagHandlers));
+    if (err) {
+      callback(err, null);
+      return;
+    }
+
+    var documents;
+    try {
+      documents = YAML.parse(data, tagHandlers);
+    }
+    catch (err) {
+      callback(err, null);
+      return;
+    }
+
+    callback(null, documents);
   });
 };
 
@@ -409,7 +422,15 @@ YAML.writeFile = function(filename) {
   if (numDocuments !== 0 && typeof documents[numDocuments - 1] === 'function')
     callback = documents.pop();
 
-  var data = YAML.stringify.apply(this, documents);
+  var data;
+  try {
+    data = YAML.stringify.apply(this, documents);
+  }
+  catch (err) {
+    callback(err, null);
+    return;
+  }
+
   fs.writeFile(filename, data, callback);
 };
 

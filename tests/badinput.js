@@ -17,10 +17,8 @@ test('bad parser input async', function(t) {
   t.plan(1);
 
   YAML.readFile(testutil.inputPath('badinput'), function(err) {
-    t.similar(err, {
-      name: "Error",
-      message: "did not find expected key, while parsing a block mapping, on line 2"
-    });
+    t.equal(err.message,
+      "did not find expected key, while parsing a block mapping, on line 2");
   });
 });
 
