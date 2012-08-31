@@ -13,6 +13,17 @@ test('bad parser input', function(t) {
   });
 });
 
+test('bad parser input async', function(t) {
+  t.plan(1);
+
+  YAML.readFile(testutil.inputPath('badinput'), function(err) {
+    t.similar(err, {
+      name: "Error",
+      message: "did not find expected key, while parsing a block mapping, on line 2"
+    });
+  });
+});
+
 test('bad emitter input', function(t) {
   t.plan(1);
 
