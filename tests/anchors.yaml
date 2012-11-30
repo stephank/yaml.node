@@ -1,0 +1,13 @@
+base: &base
+  foo: 3
+  bar: 5
+
+copy: *base
+
+mergeBefore:
+  <<: *base
+  bar: 15
+
+mergeAfter:
+  bar: 15
+  <<: *base
