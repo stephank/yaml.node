@@ -7,6 +7,7 @@ testutil.simple('integers', [
     'octal': 685230,
     'hexadecimal': 685230,
     'binary': 685230,
-    'sexagesimal': 685230
+    'sexagesimal': 685230,
+    'string': '685230'
   }
 ]);

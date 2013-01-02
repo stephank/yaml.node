@@ -6,6 +6,7 @@ testutil.simple('floats', [
     'exponential': 685230.15,
     'fixed': 685230.15,
     'sexagesimal': 685230.15,
+    'string': '685_230.15',
     'infinity': Infinity,
     'negative infinity': -Infinity,
     'not a number': NaN
