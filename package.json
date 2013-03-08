@@ -20,7 +20,7 @@
   "dependencies": {},
   "devDependencies": {
     "underscore": "1",
-    "tap": "0.3"
+    "tap": "0.4"
   },
 
   "scripts": {
