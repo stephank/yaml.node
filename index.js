@@ -109,6 +109,7 @@ var definitelyNonNumericRe = /^[a-z~]/i,
     definitelyNonBooleanRe = /^[^ytonf~]/i,
     canParseIntRe   = /^[-+]?(0x[0-9a-fA-F_]+|[\d_]+)$/,
     canParseFloatRe = /^[-+]?(\d[\d_]*)?\.[\d_]*(e[-+]\d+)?$/i,
+    octalRe  = /^[-+]?0\d/,
     nullRe   = /^(~|null)$/i,
     trueRe   = /^(y|yes|true|on)$/i,
     falseRe  = /^(n|no|false|off)$/i,
@@ -182,10 +183,14 @@ var parseScalar = function(v) {
     return new Date(v + "T00:00:00Z");
 
   // Regular numbers.
-  if (canParseIntRe.test(v))
-    return parseInt(v.replace(underscoresRe, ''), 0);
-  if (canParseFloatRe.test(v))
-    return parseFloat(v.replace(underscoresRe, ''));
+  if (canParseIntRe.test(v)) {
+    v = v.replace(underscoresRe, '');
+    return parseInt(v, octalRe.test(v) ? 8 : 0);
+  }
+  if (canParseFloatRe.test(v)) {
+    v = v.replace(underscoresRe, '');
+    return parseFloat(v);
+  }
 
   // Times.
   var m = timeRe.exec(v);
