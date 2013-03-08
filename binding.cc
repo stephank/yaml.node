@@ -582,3 +582,5 @@ init(Handle<Object> target)
 {
   yaml::Initialize(target);
 }
+
+NODE_MODULE(binding, init)
