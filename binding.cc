@@ -442,6 +442,7 @@ private:
 
   static NAN_METHOD(New)
   {
+    NanScope();
     if (args.Length() != 1)
       return NanThrowTypeError("Expected one argument");
     if (!args[0]->IsFunction())
@@ -462,6 +463,7 @@ private:
 
   static NAN_METHOD(Event)
   {
+    NanScope();
     if (args.Length() != 1)
       return NanThrowTypeError("Expected one argument");
     if (!args[0]->IsObject())
