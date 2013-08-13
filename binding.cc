@@ -1,9 +1,10 @@
 // YAML.node, © 2012 Stéphan Kochen
 // MIT-licensed. (See the included LICENSE file.)
 
-#include <v8.h>
 #include <node.h>
+#include <v8.h>
 #include <yaml.h>
+#include "nan.h"
 
 using namespace v8;
 using namespace node;
@@ -74,13 +75,21 @@ BoolToJs(int value)
 static inline Handle<Value>
 StringToJs(yaml_char_t *value)
 {
-  return value ? String::New((const char *)value) : Null();
+  if (value) {
+    return String::New((const char *)value);
+  } else {
+    return Null();
+  }
 }
 
 static inline Handle<Value>
 StringToJs(yaml_char_t *value, size_t length)
 {
-  return value ? String::New((const char *)value, (int)length) : Null();
+  if (value) {
+    return String::New((const char *)value, (int)length);
+  } else {
+    return Null();
+  }
 }
 
 
@@ -89,9 +98,9 @@ static inline Local<Object>
 MarkToJs(yaml_mark_t &mark)
 {
   Local<Object> obj = Object::New();
-  obj->Set(index_symbol,  Integer::NewFromUnsigned(mark.index));
-  obj->Set(line_symbol,   Integer::NewFromUnsigned(mark.line));
-  obj->Set(column_symbol, Integer::NewFromUnsigned(mark.column));
+  obj->Set(NanPersistentToLocal(index_symbol),  Integer::NewFromUnsigned(mark.index));
+  obj->Set(NanPersistentToLocal(line_symbol),   Integer::NewFromUnsigned(mark.line));
+  obj->Set(NanPersistentToLocal(column_symbol), Integer::NewFromUnsigned(mark.column));
   return obj;
 }
 
@@ -104,92 +113,92 @@ EventToJs(yaml_event_t &event)
 
   // Create the event object.
   obj = Object::New();
-  obj->Set(start_symbol, MarkToJs(event.start_mark));
-  obj->Set(end_symbol,   MarkToJs(event.end_mark));
+  obj->Set(NanPersistentToLocal(start_symbol), MarkToJs(event.start_mark));
+  obj->Set(NanPersistentToLocal(end_symbol),   MarkToJs(event.end_mark));
 
   switch (event.type) {
     case YAML_STREAM_START_EVENT:
-      obj->Set(type_symbol, stream_start_symbol);
+      obj->Set(NanPersistentToLocal(type_symbol), NanPersistentToLocal(stream_start_symbol));
       break;
 
     case YAML_STREAM_END_EVENT:
-      obj->Set(type_symbol, stream_end_symbol);
+      obj->Set(NanPersistentToLocal(type_symbol), NanPersistentToLocal(stream_end_symbol));
       break;
 
     case YAML_DOCUMENT_START_EVENT:
-      obj->Set(type_symbol, document_start_symbol);
+      obj->Set(NanPersistentToLocal(type_symbol), NanPersistentToLocal(document_start_symbol));
       if (event.data.document_start.version_directive) {
         tmp = Object::New();
-        tmp->Set(major_symbol, Integer::New(event.data.document_start.version_directive->major));
-        tmp->Set(minor_symbol, Integer::New(event.data.document_start.version_directive->minor));
-        obj->Set(version_symbol, tmp);
+        tmp->Set(NanPersistentToLocal(major_symbol), Integer::New(event.data.document_start.version_directive->major));
+        tmp->Set(NanPersistentToLocal(minor_symbol), Integer::New(event.data.document_start.version_directive->minor));
+        obj->Set(NanPersistentToLocal(version_symbol), tmp);
       }
       else
-        obj->Set(version_symbol, Null());
-      obj->Set(implicit_symbol, BoolToJs(event.data.document_start.implicit));
+        obj->Set(NanPersistentToLocal(version_symbol), Null());
+      obj->Set(NanPersistentToLocal(implicit_symbol), BoolToJs(event.data.document_start.implicit));
       break;
 
     case YAML_DOCUMENT_END_EVENT:
-      obj->Set(type_symbol, document_end_symbol);
-      obj->Set(implicit_symbol, BoolToJs(event.data.document_end.implicit));
+      obj->Set(NanPersistentToLocal(type_symbol), NanPersistentToLocal(document_end_symbol));
+      obj->Set(NanPersistentToLocal(implicit_symbol), BoolToJs(event.data.document_end.implicit));
       break;
 
     case YAML_ALIAS_EVENT:
-      obj->Set(type_symbol, alias_symbol);
-      obj->Set(anchor_symbol, StringToJs(event.data.alias.anchor));
+      obj->Set(NanPersistentToLocal(type_symbol), NanPersistentToLocal(alias_symbol));
+      obj->Set(NanPersistentToLocal(anchor_symbol), StringToJs(event.data.alias.anchor));
       break;
 
     case YAML_SCALAR_EVENT:
-      obj->Set(type_symbol, scalar_symbol);
-      obj->Set(anchor_symbol, StringToJs(event.data.scalar.anchor));
-      obj->Set(tag_symbol,    StringToJs(event.data.scalar.tag));
-      obj->Set(value_symbol,  StringToJs(event.data.scalar.value, event.data.scalar.length));
-      obj->Set(plain_implicit_symbol,  BoolToJs(event.data.scalar.plain_implicit));
-      obj->Set(quoted_implicit_symbol, BoolToJs(event.data.scalar.quoted_implicit));
+      obj->Set(NanPersistentToLocal(type_symbol), NanPersistentToLocal(scalar_symbol));
+      obj->Set(NanPersistentToLocal(anchor_symbol), StringToJs(event.data.scalar.anchor));
+      obj->Set(NanPersistentToLocal(tag_symbol),    StringToJs(event.data.scalar.tag));
+      obj->Set(NanPersistentToLocal(value_symbol),  StringToJs(event.data.scalar.value, event.data.scalar.length));
+      obj->Set(NanPersistentToLocal(plain_implicit_symbol),  BoolToJs(event.data.scalar.plain_implicit));
+      obj->Set(NanPersistentToLocal(quoted_implicit_symbol), BoolToJs(event.data.scalar.quoted_implicit));
       switch (event.data.scalar.style) {
-        case YAML_PLAIN_SCALAR_STYLE:         obj->Set(style_symbol, plain_symbol);         break;
-        case YAML_SINGLE_QUOTED_SCALAR_STYLE: obj->Set(style_symbol, single_quoted_symbol); break;
-        case YAML_DOUBLE_QUOTED_SCALAR_STYLE: obj->Set(style_symbol, double_quoted_symbol); break;
-        case YAML_LITERAL_SCALAR_STYLE:       obj->Set(style_symbol, literal_symbol);       break;
-        case YAML_FOLDED_SCALAR_STYLE:        obj->Set(style_symbol, folded_symbol);        break;
+        case YAML_PLAIN_SCALAR_STYLE:         obj->Set(NanPersistentToLocal(style_symbol), NanPersistentToLocal(plain_symbol));         break;
+        case YAML_SINGLE_QUOTED_SCALAR_STYLE: obj->Set(NanPersistentToLocal(style_symbol), NanPersistentToLocal(single_quoted_symbol)); break;
+        case YAML_DOUBLE_QUOTED_SCALAR_STYLE: obj->Set(NanPersistentToLocal(style_symbol), NanPersistentToLocal(double_quoted_symbol)); break;
+        case YAML_LITERAL_SCALAR_STYLE:       obj->Set(NanPersistentToLocal(style_symbol), NanPersistentToLocal(literal_symbol));       break;
+        case YAML_FOLDED_SCALAR_STYLE:        obj->Set(NanPersistentToLocal(style_symbol), NanPersistentToLocal(folded_symbol));        break;
         default: break;
       }
       break;
 
     case YAML_SEQUENCE_START_EVENT:
-      obj->Set(type_symbol, sequence_start_symbol);
-      obj->Set(anchor_symbol,    StringToJs(event.data.sequence_start.anchor));
-      obj->Set(tag_symbol,       StringToJs(event.data.sequence_start.tag));
-      obj->Set(implicit_symbol, BoolToJs(event.data.sequence_start.implicit));
+      obj->Set(NanPersistentToLocal(type_symbol), NanPersistentToLocal(sequence_start_symbol));
+      obj->Set(NanPersistentToLocal(anchor_symbol),    StringToJs(event.data.sequence_start.anchor));
+      obj->Set(NanPersistentToLocal(tag_symbol),       StringToJs(event.data.sequence_start.tag));
+      obj->Set(NanPersistentToLocal(implicit_symbol), BoolToJs(event.data.sequence_start.implicit));
       switch (event.data.sequence_start.style) {
-        case YAML_BLOCK_SEQUENCE_STYLE: obj->Set(style_symbol, block_symbol); break;
-        case YAML_FLOW_SEQUENCE_STYLE:  obj->Set(style_symbol, flow_symbol);  break;
+        case YAML_BLOCK_SEQUENCE_STYLE: obj->Set(NanPersistentToLocal(style_symbol), NanPersistentToLocal(block_symbol)); break;
+        case YAML_FLOW_SEQUENCE_STYLE:  obj->Set(NanPersistentToLocal(style_symbol), NanPersistentToLocal(flow_symbol));  break;
         default: break;
       }
       break;
 
     case YAML_SEQUENCE_END_EVENT:
-      obj->Set(type_symbol, sequence_end_symbol);
+      obj->Set(NanPersistentToLocal(type_symbol), NanPersistentToLocal(sequence_end_symbol));
       break;
 
     case YAML_MAPPING_START_EVENT:
-      obj->Set(type_symbol, mapping_start_symbol);
-      obj->Set(anchor_symbol,    StringToJs(event.data.mapping_start.anchor));
-      obj->Set(tag_symbol,       StringToJs(event.data.mapping_start.tag));
-      obj->Set(implicit_symbol, BoolToJs(event.data.mapping_start.implicit));
+      obj->Set(NanPersistentToLocal(type_symbol), NanPersistentToLocal(mapping_start_symbol));
+      obj->Set(NanPersistentToLocal(anchor_symbol),    StringToJs(event.data.mapping_start.anchor));
+      obj->Set(NanPersistentToLocal(tag_symbol),       StringToJs(event.data.mapping_start.tag));
+      obj->Set(NanPersistentToLocal(implicit_symbol), BoolToJs(event.data.mapping_start.implicit));
       switch (event.data.mapping_start.style) {
-        case YAML_BLOCK_MAPPING_STYLE: obj->Set(style_symbol, block_symbol); break;
-        case YAML_FLOW_MAPPING_STYLE:  obj->Set(style_symbol, flow_symbol);  break;
+        case YAML_BLOCK_MAPPING_STYLE: obj->Set(NanPersistentToLocal(style_symbol), NanPersistentToLocal(block_symbol)); break;
+        case YAML_FLOW_MAPPING_STYLE:  obj->Set(NanPersistentToLocal(style_symbol), NanPersistentToLocal(flow_symbol));  break;
         default: break;
       }
       break;
 
     case YAML_MAPPING_END_EVENT:
-      obj->Set(type_symbol, mapping_end_symbol);
+      obj->Set(NanPersistentToLocal(type_symbol), NanPersistentToLocal(mapping_end_symbol));
       break;
 
     default:
-      obj->Set(type_symbol, Null());
+      obj->Set(NanPersistentToLocal(type_symbol), Null());
       break;
   }
 
@@ -204,35 +213,35 @@ JsToEvent(Local<Object> &obj)
   yaml_event_t *event = new yaml_event_t;
   event->type = YAML_NO_EVENT;
 
-  Local<Value> type = obj->Get(type_symbol);
+  Local<Value> type = obj->Get(NanPersistentToLocal(type_symbol));
 
-  if (type->StrictEquals(stream_start_symbol)) {
+  if (type->StrictEquals(NanPersistentToLocal(stream_start_symbol))) {
     // FIXME: Detect endianness?
     yaml_stream_start_event_initialize(event, YAML_ANY_ENCODING);
   }
 
-  else if (type->StrictEquals(stream_end_symbol)) {
+  else if (type->StrictEquals(NanPersistentToLocal(stream_end_symbol))) {
     yaml_stream_end_event_initialize(event);
   }
 
-  else if (type->StrictEquals(document_start_symbol)) {
+  else if (type->StrictEquals(NanPersistentToLocal(document_start_symbol))) {
     yaml_document_start_event_initialize(event, NULL, NULL, NULL, 0);
   }
 
-  else if (type->StrictEquals(document_end_symbol)) {
+  else if (type->StrictEquals(NanPersistentToLocal(document_end_symbol))) {
     yaml_document_end_event_initialize(event, 0);
   }
 
-  else if (type->StrictEquals(alias_symbol)) {
-    Local<Value> tmp = obj->Get(anchor_symbol);
+  else if (type->StrictEquals(NanPersistentToLocal(alias_symbol))) {
+    Local<Value> tmp = obj->Get(NanPersistentToLocal(anchor_symbol));
     if (!tmp->IsString()) goto end;
     String::AsciiValue anchor(tmp->ToString());
 
     yaml_alias_event_initialize(event, (yaml_char_t *)*anchor);
   }
 
-  else if (type->StrictEquals(scalar_symbol)) {
-    Local<Value> tmp = obj->Get(value_symbol);
+  else if (type->StrictEquals(NanPersistentToLocal(scalar_symbol))) {
+    Local<Value> tmp = obj->Get(NanPersistentToLocal(value_symbol));
     if (!tmp->IsString()) goto end;
     String::AsciiValue value(tmp->ToString());
 
@@ -241,19 +250,19 @@ JsToEvent(Local<Object> &obj)
         1, 1, YAML_ANY_SCALAR_STYLE);
   }
 
-  else if (type->StrictEquals(sequence_start_symbol)) {
+  else if (type->StrictEquals(NanPersistentToLocal(sequence_start_symbol))) {
     yaml_sequence_start_event_initialize(event, NULL, NULL, 0, YAML_ANY_SEQUENCE_STYLE);
   }
 
-  else if (type->StrictEquals(sequence_end_symbol)) {
+  else if (type->StrictEquals(NanPersistentToLocal(sequence_end_symbol))) {
     yaml_sequence_end_event_initialize(event);
   }
 
-  else if (type->StrictEquals(mapping_start_symbol)) {
+  else if (type->StrictEquals(NanPersistentToLocal(mapping_start_symbol))) {
     yaml_mapping_start_event_initialize(event, NULL, NULL, 0, YAML_ANY_MAPPING_STYLE);
   }
 
-  else if (type->StrictEquals(mapping_end_symbol)) {
+  else if (type->StrictEquals(NanPersistentToLocal(mapping_end_symbol))) {
     yaml_mapping_end_event_initialize(event);
   }
 
@@ -278,11 +287,11 @@ ParserErrorToJs(yaml_parser_t &parser)
       error = Local<Object>::Cast(Exception::Error(problem));
 
       mark = Object::New();
-      mark->Set(offset_symbol, Integer::NewFromUnsigned(parser.problem_offset));
-      mark->Set(value_symbol, Integer::NewFromUnsigned(parser.problem_value));
+      mark->Set(NanPersistentToLocal(offset_symbol), Integer::NewFromUnsigned(parser.problem_offset));
+      mark->Set(NanPersistentToLocal(value_symbol), Integer::NewFromUnsigned(parser.problem_value));
       if (parser.problem != NULL)
-        mark->Set(description_symbol, String::New(parser.problem));
-      error->Set(problem_symbol, mark);
+        mark->Set(NanPersistentToLocal(description_symbol), String::New(parser.problem));
+      error->Set(NanPersistentToLocal(problem_symbol), mark);
 
       break;
 
@@ -301,14 +310,14 @@ ParserErrorToJs(yaml_parser_t &parser)
 
       if (parser.context != NULL) {
         mark = MarkToJs(parser.context_mark);
-        mark->Set(description_symbol, String::New(parser.context));
-        error->Set(context_symbol, mark);
+        mark->Set(NanPersistentToLocal(description_symbol), String::New(parser.context));
+        error->Set(NanPersistentToLocal(context_symbol), mark);
       }
 
       if (parser.problem != NULL) {
         mark = MarkToJs(parser.problem_mark);
-        mark->Set(description_symbol, String::New(parser.problem));
-        error->Set(problem_symbol, mark);
+        mark->Set(NanPersistentToLocal(description_symbol), String::New(parser.problem));
+        error->Set(NanPersistentToLocal(problem_symbol), mark);
       }
 
       break;
@@ -337,21 +346,17 @@ EmitterErrorToJs(yaml_emitter_t &emitter)
 //     parse(input, handler);
 //
 // Where `input` is a string, and `handler` is a function receiving events.
-static Handle<Value>
-Parse(const Arguments &args)
+static NAN_METHOD(Parse)
 {
-  HandleScope scope;
+  NanScope();
 
   // Check arguments.
   if (args.Length() != 2)
-    return ThrowException(Exception::Error(
-        String::New("Two arguments were expected.")));
+    return NanThrowError("Two arguments were expected.");
   if (!args[0]->IsString())
-    return ThrowException(Exception::TypeError(
-        String::New("Input must be a string.")));
+    return NanThrowTypeError("Input must be a string.");
   if (!args[1]->IsFunction())
-    return ThrowException(Exception::TypeError(
-        String::New("Handler must be a function.")));
+    return NanThrowTypeError("Handler must be a function.");
 
   // Dereference arguments.
   String::Value value(args[0]);
@@ -372,8 +377,7 @@ Parse(const Arguments &args)
   // Initialize parser.
   yaml_parser_t parser;
   if (!yaml_parser_initialize(&parser))
-    return ThrowException(Exception::Error(
-        String::New("Could not initiaize libYAML")));
+    return NanThrowError("Could not initiaize libYAML");
   // FIXME: Detect endianness?
   yaml_parser_set_encoding(&parser, YAML_UTF16LE_ENCODING);
   yaml_parser_set_input_string(&parser, string, size);
@@ -383,7 +387,7 @@ Parse(const Arguments &args)
   while (true) {
     // Get the next event, or throw an exception.
     if (yaml_parser_parse(&parser, &event) == 0)
-      return ThrowException(ParserErrorToJs(parser));
+      return NanThrowError(ParserErrorToJs(parser));
 
     // Call the handler method.
     Local<Value> params[1] = { EventToJs(event) };
@@ -402,7 +406,7 @@ Parse(const Arguments &args)
   // Clean up the parser.
   yaml_parser_delete(&parser);
 
-  return Undefined();
+  NanReturnUndefined();
 }
 
 
@@ -436,57 +440,48 @@ public:
 private:
   Emitter() {}
 
-  static Handle<Value>
-  New(const Arguments &args)
+  static NAN_METHOD(New)
   {
     if (args.Length() != 1)
-      return ThrowException(Exception::TypeError(
-          String::New("Expected one argument")));
+      return NanThrowTypeError("Expected one argument");
     if (!args[0]->IsFunction())
-      return ThrowException(Exception::TypeError(
-          String::New("Expected a function")));
+      return NanThrowTypeError("Expected a function");
 
     Emitter *e = new Emitter();
 
     if (!yaml_emitter_initialize(&e->emitter_))
-      return ThrowException(Exception::Error(
-          String::New("Could not initiaize libYAML")));
+      return NanThrowError("Could not initiaize libYAML");
     // FIXME: Detect endianness?
     yaml_emitter_set_encoding(&e->emitter_, YAML_UTF16LE_ENCODING);
     yaml_emitter_set_output(&e->emitter_, WriteHandler, e);
 
-    e->writeCallback_ = Persistent<Function>::New(
-        Handle<Function>::Cast(args[0]));
-
+    NanAssignPersistent(Function, e->writeCallback_, args[0].As<Function>());
     e->Wrap(args.This());
-    return e->handle_;
+    NanReturnValue(NanObjectWrapHandle(e));
   }
 
-  static Handle<Value>
-  Event(const Arguments &args)
+  static NAN_METHOD(Event)
   {
     if (args.Length() != 1)
-      return ThrowException(Exception::TypeError(
-          String::New("Expected one argument")));
+      return NanThrowTypeError("Expected one argument");
     if (!args[0]->IsObject())
-      return ThrowException(Exception::TypeError(
-          String::New("Expected an object")));
+      return NanThrowTypeError("Expected an object");
     Local<Object> obj = Local<Object>::Cast(args[0]);
 
     Emitter *e = ObjectWrap::Unwrap<Emitter>(args.This());
 
     yaml_event_t *ev = JsToEvent(obj);
     if (yaml_emitter_emit(&e->emitter_, ev) == 0)
-      return ThrowException(EmitterErrorToJs(e->emitter_));
+      return NanThrowError(EmitterErrorToJs(e->emitter_));
 
-    return Undefined();
+    NanReturnUndefined();
   }
 
   static int
   WriteHandler(void *data, unsigned char *buffer, size_t size)
   {
     Emitter *e = (Emitter *)data;
-    HandleScope scope;
+    NanScope();
 
     // V8 expects UTF-16 as uint16_t.
     const uint16_t *string = (const uint16_t *)buffer;
@@ -501,7 +496,7 @@ private:
     // Call the write callback.
     TryCatch try_catch;
     Local<Value> params[1] = { String::New(string, size) };
-    e->writeCallback_->Call(Context::GetCurrent()->Global(), 1, params);
+    NanPersistentToLocal(e->writeCallback_)->Call(Context::GetCurrent()->Global(), 1, params);
     if (try_catch.HasCaught()) {
       FatalException(try_catch);
       return 0;
@@ -520,51 +515,51 @@ private:
 static void
 Initialize(Handle<Object> target)
 {
-  HandleScope scope;
+  NanScope();
 
-  stream_start_symbol   = NODE_PSYMBOL("streamStart");
-  stream_end_symbol     = NODE_PSYMBOL("streamEnd");
-  document_start_symbol = NODE_PSYMBOL("documentStart");
-  document_end_symbol   = NODE_PSYMBOL("documentEnd");
-  alias_symbol          = NODE_PSYMBOL("alias");
-  scalar_symbol         = NODE_PSYMBOL("scalar");
-  sequence_start_symbol = NODE_PSYMBOL("sequenceStart");
-  sequence_end_symbol   = NODE_PSYMBOL("sequenceEnd");
-  mapping_start_symbol  = NODE_PSYMBOL("mappingStart");
-  mapping_end_symbol    = NODE_PSYMBOL("mappingEnd");
+  NanAssignPersistent(String, stream_start_symbol, String::NewSymbol("streamStart"));
+  NanAssignPersistent(String, stream_end_symbol, String::NewSymbol("streamEnd"));
+  NanAssignPersistent(String, document_start_symbol, String::NewSymbol("documentStart"));
+  NanAssignPersistent(String, document_end_symbol, String::NewSymbol("documentEnd"));
+  NanAssignPersistent(String, alias_symbol, String::NewSymbol("alias"));
+  NanAssignPersistent(String, scalar_symbol, String::NewSymbol("scalar"));
+  NanAssignPersistent(String, sequence_start_symbol, String::NewSymbol("sequenceStart"));
+  NanAssignPersistent(String, sequence_end_symbol, String::NewSymbol("sequenceEnd"));
+  NanAssignPersistent(String, mapping_start_symbol, String::NewSymbol("mappingStart"));
+  NanAssignPersistent(String, mapping_end_symbol, String::NewSymbol("mappingEnd"));
 
-  index_symbol  = NODE_PSYMBOL("index");
-  line_symbol   = NODE_PSYMBOL("line");
-  column_symbol = NODE_PSYMBOL("column");
+  NanAssignPersistent(String, index_symbol, String::NewSymbol("index"));
+  NanAssignPersistent(String, line_symbol, String::NewSymbol("line"));
+  NanAssignPersistent(String, column_symbol, String::NewSymbol("column"));
 
-  start_symbol    = NODE_PSYMBOL("start");
-  end_symbol      = NODE_PSYMBOL("end");
-  type_symbol     = NODE_PSYMBOL("type");
-  major_symbol    = NODE_PSYMBOL("major");
-  minor_symbol    = NODE_PSYMBOL("minor");
-  version_symbol  = NODE_PSYMBOL("version");
-  implicit_symbol = NODE_PSYMBOL("implicit");
-  anchor_symbol   = NODE_PSYMBOL("anchor");
-  tag_symbol      = NODE_PSYMBOL("tag");
-  value_symbol    = NODE_PSYMBOL("value");
-  plain_implicit_symbol  = NODE_PSYMBOL("plain_implicit");
-  quoted_implicit_symbol = NODE_PSYMBOL("quoted_implicit");
-  style_symbol    = NODE_PSYMBOL("style");
+  NanAssignPersistent(String, start_symbol, String::NewSymbol("start"));
+  NanAssignPersistent(String, end_symbol, String::NewSymbol("end"));
+  NanAssignPersistent(String, type_symbol, String::NewSymbol("type"));
+  NanAssignPersistent(String, major_symbol, String::NewSymbol("major"));
+  NanAssignPersistent(String, minor_symbol, String::NewSymbol("minor"));
+  NanAssignPersistent(String, version_symbol, String::NewSymbol("version"));
+  NanAssignPersistent(String, implicit_symbol, String::NewSymbol("implicit"));
+  NanAssignPersistent(String, anchor_symbol, String::NewSymbol("anchor"));
+  NanAssignPersistent(String, tag_symbol, String::NewSymbol("tag"));
+  NanAssignPersistent(String, value_symbol, String::NewSymbol("value"));
+  NanAssignPersistent(String, plain_implicit_symbol, String::NewSymbol("plain_implicit"));
+  NanAssignPersistent(String, quoted_implicit_symbol, String::NewSymbol("quoted_implicit"));
+  NanAssignPersistent(String, style_symbol, String::NewSymbol("style"));
 
-  plain_symbol   = NODE_PSYMBOL("plain");
-  single_quoted_symbol = NODE_PSYMBOL("single-quoted");
-  double_quoted_symbol = NODE_PSYMBOL("double-quoted");
-  literal_symbol = NODE_PSYMBOL("literal");
-  folded_symbol  = NODE_PSYMBOL("folded");
+  NanAssignPersistent(String, plain_symbol, String::NewSymbol("plain"));
+  NanAssignPersistent(String, single_quoted_symbol, String::NewSymbol("single-quoted"));
+  NanAssignPersistent(String, double_quoted_symbol, String::NewSymbol("double-quoted"));
+  NanAssignPersistent(String, literal_symbol, String::NewSymbol("literal"));
+  NanAssignPersistent(String, folded_symbol, String::NewSymbol("folded"));
 
-  block_symbol = NODE_PSYMBOL("block");
-  flow_symbol  = NODE_PSYMBOL("flow");
+  NanAssignPersistent(String, block_symbol, String::NewSymbol("block"));
+  NanAssignPersistent(String, flow_symbol, String::NewSymbol("flow"));
 
-  offset_symbol      = NODE_PSYMBOL("offset");
-  // value_symbol    = NODE_PSYMBOL("value");
-  context_symbol     = NODE_PSYMBOL("context");
-  problem_symbol     = NODE_PSYMBOL("problem");
-  description_symbol = NODE_PSYMBOL("description");
+  NanAssignPersistent(String, offset_symbol, String::NewSymbol("offset"));
+  // NanAssignPersistent(String, value_symbol, String::NewSymbol("value"));
+  NanAssignPersistent(String, context_symbol, String::NewSymbol("context"));
+  NanAssignPersistent(String, problem_symbol, String::NewSymbol("problem"));
+  NanAssignPersistent(String, description_symbol, String::NewSymbol("description"));
 
   Local<FunctionTemplate> parse_template = FunctionTemplate::New(Parse);
   target->Set(String::NewSymbol("parse"), parse_template->GetFunction());
