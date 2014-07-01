@@ -18,8 +18,8 @@
       'defines': [
         'YAML_VERSION_MAJOR=0',
         'YAML_VERSION_MINOR=1',
-        'YAML_VERSION_PATCH=5',
-        'YAML_VERSION_STRING="0.1.5"'
+        'YAML_VERSION_PATCH=6',
+        'YAML_VERSION_STRING="0.1.6"'
       ],
       'sources': [
         'src/src/api.c',
