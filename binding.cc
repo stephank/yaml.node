@@ -3,6 +3,9 @@
 
 #include <v8.h>
 #include <node.h>
+#include <node_object_wrap.h>
+#include <util.h>
+#include <util-inl.h>
 #include <yaml.h>
 
 using namespace v8;
@@ -66,7 +69,7 @@ static Persistent<String> description_symbol;
 static inline Handle<Boolean>
 BoolToJs(int value)
 {
-  return value ? True() : False();
+  return value ? True(Isolate::GetCurrent()) : False(Isolate::GetCurrent());
 }
 
 
@@ -74,13 +77,19 @@ BoolToJs(int value)
 static inline Handle<Value>
 StringToJs(yaml_char_t *value)
 {
-  return value ? String::New((const char *)value) : Null();
+  if( value )
+    return String::NewFromUtf8(Isolate::GetCurrent(),(const char *)value);
+  else
+    return Null(Isolate::GetCurrent());
 }
 
 static inline Handle<Value>
 StringToJs(yaml_char_t *value, size_t length)
 {
-  return value ? String::New((const char *)value, (int)length) : Null();
+  if( value )
+    return String::NewFromUtf8(Isolate::GetCurrent(),(const char *)value, String::kNormalString, (int)length);
+  else
+    return Null(Isolate::GetCurrent());
 }
 
 
@@ -88,10 +97,17 @@ StringToJs(yaml_char_t *value, size_t length)
 static inline Local<Object>
 MarkToJs(yaml_mark_t &mark)
 {
-  Local<Object> obj = Object::New();
-  obj->Set(index_symbol,  Integer::NewFromUnsigned(mark.index));
-  obj->Set(line_symbol,   Integer::NewFromUnsigned(mark.line));
-  obj->Set(column_symbol, Integer::NewFromUnsigned(mark.column));
+  Isolate* iso = Isolate::GetCurrent();
+  Handle<Integer> m_index =  Integer::NewFromUnsigned(iso, mark.index);
+  Handle<Integer> m_line = Integer::NewFromUnsigned(iso, mark.line); 
+  Handle<Integer> m_column = Integer::NewFromUnsigned(iso, mark.column);
+  Handle<String> i_sym = PersistentToLocal(iso,index_symbol);
+  Handle<String> l_sym = PersistentToLocal(iso,line_symbol);
+  Handle<String> c_sym = PersistentToLocal(iso,column_symbol); 
+ Local<Object> obj = Object::New(iso);
+  obj->Set(i_sym,  m_index );
+  obj->Set(l_sym,  m_line );
+  obj->Set(c_sym,  m_column );
   return obj;
 }
 
@@ -101,95 +117,131 @@ static inline Local<Object>
 EventToJs(yaml_event_t &event)
 {
   Local<Object> obj, tmp;
+  Isolate* iso = Isolate::GetCurrent();
+  Handle<String> start_s = PersistentToLocal(iso,start_symbol);
+  Handle<String> end_s = PersistentToLocal(iso,end_symbol);
+  Handle<Object> evsm = MarkToJs(event.start_mark);
+  Handle<Object> evem = MarkToJs(event.end_mark);
 
   // Create the event object.
-  obj = Object::New();
-  obj->Set(start_symbol, MarkToJs(event.start_mark));
-  obj->Set(end_symbol,   MarkToJs(event.end_mark));
+  obj = Object::New(iso);
+  obj->Set(start_s, evsm);
+  obj->Set(end_s,   evem);
 
+  Handle<String> ts = PersistentToLocal(iso,type_symbol);
+  Handle<String> sss = PersistentToLocal(iso,stream_start_symbol);
+  Handle<String> ses = PersistentToLocal(iso,stream_end_symbol);
+  Handle<String> dss = PersistentToLocal(iso,document_start_symbol);
+  Handle<String> des = PersistentToLocal(iso,document_end_symbol);
+  Handle<String> imps = PersistentToLocal(iso,implicit_symbol);
+  //Handle<String> majs = PersistentToLocal(iso,major_symbol);
+  //Handle<String> mins = PersistentToLocal(iso,minor_symbol);
+  Handle<String> vers = PersistentToLocal(iso,version_symbol);
+  Handle<String> as = PersistentToLocal(iso,alias_symbol);
+  Handle<String> scals = PersistentToLocal(iso,scalar_symbol);
+  Handle<String> anchors = PersistentToLocal(iso,anchor_symbol);
+  Handle<String> tags = PersistentToLocal(iso,tag_symbol);
+  Handle<String> pis = PersistentToLocal(iso,plain_implicit_symbol);
+  Handle<String> qis = PersistentToLocal(iso,quoted_implicit_symbol);
+  Handle<String> vals = PersistentToLocal(iso,value_symbol);
+  Handle<String> styles = PersistentToLocal(iso,style_symbol);
+  Handle<String> plains = PersistentToLocal(iso,plain_symbol);
+  Handle<String> sqs = PersistentToLocal(iso,single_quoted_symbol);
+  Handle<String> dqs = PersistentToLocal(iso,double_quoted_symbol);
+  Handle<String> lits = PersistentToLocal(iso,literal_symbol);
+  Handle<String> folds = PersistentToLocal(iso,folded_symbol);
+  Handle<String> blocks = PersistentToLocal(iso,block_symbol);
+  Handle<String> flows = PersistentToLocal(iso,flow_symbol);
+  Handle<String> mss = PersistentToLocal(iso,mapping_start_symbol);
+  Handle<String> mes = PersistentToLocal(iso,mapping_end_symbol);
+  Handle<String> seq_starts = PersistentToLocal(iso,sequence_start_symbol);
+  Handle<String> seq_ends = PersistentToLocal(iso,sequence_end_symbol);
+ 
+  //Handle<Integer> maj = Integer::New(iso,event.data.document_start.version_directive->major);
+  //Handle<Integer> min = Integer::New(iso,event.data.document_start.version_directive->minor);
   switch (event.type) {
     case YAML_STREAM_START_EVENT:
-      obj->Set(type_symbol, stream_start_symbol);
+      obj->Set(ts, sss);
       break;
 
     case YAML_STREAM_END_EVENT:
-      obj->Set(type_symbol, stream_end_symbol);
+      obj->Set(ts, ses);
       break;
 
     case YAML_DOCUMENT_START_EVENT:
-      obj->Set(type_symbol, document_start_symbol);
+      obj->Set(ts, dss);
       if (event.data.document_start.version_directive) {
-        tmp = Object::New();
-        tmp->Set(major_symbol, Integer::New(event.data.document_start.version_directive->major));
-        tmp->Set(minor_symbol, Integer::New(event.data.document_start.version_directive->minor));
-        obj->Set(version_symbol, tmp);
+        tmp = Object::New(iso);
+	//        tmp->Set(majs, maj);
+        //tmp->Set(mins, min);
+        obj->Set(vers, tmp);
       }
       else
-        obj->Set(version_symbol, Null());
-      obj->Set(implicit_symbol, BoolToJs(event.data.document_start.implicit));
+        obj->Set(vers, Null(iso));
+      obj->Set(imps, BoolToJs(event.data.document_start.implicit));
       break;
 
     case YAML_DOCUMENT_END_EVENT:
-      obj->Set(type_symbol, document_end_symbol);
-      obj->Set(implicit_symbol, BoolToJs(event.data.document_end.implicit));
+      obj->Set(ts, des);
+      obj->Set(imps, BoolToJs(event.data.document_end.implicit));
       break;
 
     case YAML_ALIAS_EVENT:
-      obj->Set(type_symbol, alias_symbol);
-      obj->Set(anchor_symbol, StringToJs(event.data.alias.anchor));
+      obj->Set(ts, as);
+      obj->Set(anchors, StringToJs(event.data.alias.anchor));
       break;
 
     case YAML_SCALAR_EVENT:
-      obj->Set(type_symbol, scalar_symbol);
-      obj->Set(anchor_symbol, StringToJs(event.data.scalar.anchor));
-      obj->Set(tag_symbol,    StringToJs(event.data.scalar.tag));
-      obj->Set(value_symbol,  StringToJs(event.data.scalar.value, event.data.scalar.length));
-      obj->Set(plain_implicit_symbol,  BoolToJs(event.data.scalar.plain_implicit));
-      obj->Set(quoted_implicit_symbol, BoolToJs(event.data.scalar.quoted_implicit));
+      obj->Set(ts, scals);
+      obj->Set(anchors, StringToJs(event.data.scalar.anchor));
+      obj->Set(tags,    StringToJs(event.data.scalar.tag));
+      obj->Set(vals,  StringToJs(event.data.scalar.value, event.data.scalar.length));
+      obj->Set(pis,  BoolToJs(event.data.scalar.plain_implicit));
+      obj->Set(qis, BoolToJs(event.data.scalar.quoted_implicit));
       switch (event.data.scalar.style) {
-        case YAML_PLAIN_SCALAR_STYLE:         obj->Set(style_symbol, plain_symbol);         break;
-        case YAML_SINGLE_QUOTED_SCALAR_STYLE: obj->Set(style_symbol, single_quoted_symbol); break;
-        case YAML_DOUBLE_QUOTED_SCALAR_STYLE: obj->Set(style_symbol, double_quoted_symbol); break;
-        case YAML_LITERAL_SCALAR_STYLE:       obj->Set(style_symbol, literal_symbol);       break;
-        case YAML_FOLDED_SCALAR_STYLE:        obj->Set(style_symbol, folded_symbol);        break;
+        case YAML_PLAIN_SCALAR_STYLE:   obj->Set(styles, plains); break;
+      case YAML_SINGLE_QUOTED_SCALAR_STYLE: obj->Set(styles,sqs); break;
+      case YAML_DOUBLE_QUOTED_SCALAR_STYLE: obj->Set(styles,dqs); break;
+      case YAML_LITERAL_SCALAR_STYLE: obj->Set(styles,lits);      break;
+      case YAML_FOLDED_SCALAR_STYLE: obj->Set(styles,folds);      break;
         default: break;
       }
       break;
 
     case YAML_SEQUENCE_START_EVENT:
-      obj->Set(type_symbol, sequence_start_symbol);
-      obj->Set(anchor_symbol,    StringToJs(event.data.sequence_start.anchor));
-      obj->Set(tag_symbol,       StringToJs(event.data.sequence_start.tag));
-      obj->Set(implicit_symbol, BoolToJs(event.data.sequence_start.implicit));
+      obj->Set(ts,seq_starts);
+      obj->Set(anchors,    StringToJs(event.data.sequence_start.anchor));
+      obj->Set(tags,       StringToJs(event.data.sequence_start.tag));
+      obj->Set(imps, BoolToJs(event.data.sequence_start.implicit));
       switch (event.data.sequence_start.style) {
-        case YAML_BLOCK_SEQUENCE_STYLE: obj->Set(style_symbol, block_symbol); break;
-        case YAML_FLOW_SEQUENCE_STYLE:  obj->Set(style_symbol, flow_symbol);  break;
+      case YAML_BLOCK_SEQUENCE_STYLE: obj->Set(styles,blocks); break;
+      case YAML_FLOW_SEQUENCE_STYLE:  obj->Set(styles,flows);  break;
         default: break;
       }
       break;
 
     case YAML_SEQUENCE_END_EVENT:
-      obj->Set(type_symbol, sequence_end_symbol);
+      obj->Set(ts,seq_ends);
       break;
 
     case YAML_MAPPING_START_EVENT:
-      obj->Set(type_symbol, mapping_start_symbol);
-      obj->Set(anchor_symbol,    StringToJs(event.data.mapping_start.anchor));
-      obj->Set(tag_symbol,       StringToJs(event.data.mapping_start.tag));
-      obj->Set(implicit_symbol, BoolToJs(event.data.mapping_start.implicit));
+      obj->Set(ts,mss);
+      obj->Set(anchors,    StringToJs(event.data.mapping_start.anchor));
+      obj->Set(tags,       StringToJs(event.data.mapping_start.tag));
+      obj->Set(imps, BoolToJs(event.data.mapping_start.implicit));
       switch (event.data.mapping_start.style) {
-        case YAML_BLOCK_MAPPING_STYLE: obj->Set(style_symbol, block_symbol); break;
-        case YAML_FLOW_MAPPING_STYLE:  obj->Set(style_symbol, flow_symbol);  break;
+        case YAML_BLOCK_MAPPING_STYLE: obj->Set(styles, blocks); break;
+        case YAML_FLOW_MAPPING_STYLE:  obj->Set(styles, flows);  break;
         default: break;
       }
       break;
 
     case YAML_MAPPING_END_EVENT:
-      obj->Set(type_symbol, mapping_end_symbol);
+      obj->Set(ts,mes);
       break;
 
     default:
-      obj->Set(type_symbol, Null());
+      obj->Set(ts, Null(iso));
       break;
   }
 
@@ -201,59 +253,73 @@ EventToJs(yaml_event_t &event)
 static inline yaml_event_t *
 JsToEvent(Local<Object> &obj)
 {
+  Isolate* iso = Isolate::GetCurrent();
+  Handle<String> ts = PersistentToLocal(iso,type_symbol);
+  Handle<String> sss = PersistentToLocal(iso,stream_start_symbol);
+  Handle<String> ses = PersistentToLocal(iso,stream_end_symbol);
+  Handle<String> dss = PersistentToLocal(iso,document_start_symbol);
+  Handle<String> des = PersistentToLocal(iso,document_end_symbol);
+  Handle<String> as = PersistentToLocal(iso,alias_symbol);
+  Handle<String> scals = PersistentToLocal(iso,scalar_symbol);
+  Handle<String> anchors = PersistentToLocal(iso,anchor_symbol);
+  Handle<String> vals = PersistentToLocal(iso,value_symbol);
+  Handle<String> mss = PersistentToLocal(iso,mapping_start_symbol);
+  Handle<String> mes = PersistentToLocal(iso,mapping_end_symbol);
+  Handle<String> seq_starts = PersistentToLocal(iso,sequence_start_symbol);
+  Handle<String> seq_ends = PersistentToLocal(iso,sequence_end_symbol);
   yaml_event_t *event = new yaml_event_t;
   event->type = YAML_NO_EVENT;
 
-  Local<Value> type = obj->Get(type_symbol);
+  Local<Value> type = obj->Get(ts);
 
-  if (type->StrictEquals(stream_start_symbol)) {
+  if (type->StrictEquals(sss)) {
     // FIXME: Detect endianness?
     yaml_stream_start_event_initialize(event, YAML_ANY_ENCODING);
   }
 
-  else if (type->StrictEquals(stream_end_symbol)) {
+  else if (type->StrictEquals(ses)) {
     yaml_stream_end_event_initialize(event);
   }
 
-  else if (type->StrictEquals(document_start_symbol)) {
+  else if (type->StrictEquals(dss)) {
     yaml_document_start_event_initialize(event, NULL, NULL, NULL, 0);
   }
 
-  else if (type->StrictEquals(document_end_symbol)) {
+  else if (type->StrictEquals(des)) {
     yaml_document_end_event_initialize(event, 0);
   }
 
-  else if (type->StrictEquals(alias_symbol)) {
-    Local<Value> tmp = obj->Get(anchor_symbol);
+  else if (type->StrictEquals(as)) {
+    Local<Value> tmp = obj->Get(anchors);
     if (!tmp->IsString()) goto end;
-    String::AsciiValue anchor(tmp->ToString());
+    String::Utf8Value anchor(tmp->ToString());
 
     yaml_alias_event_initialize(event, (yaml_char_t *)*anchor);
   }
 
-  else if (type->StrictEquals(scalar_symbol)) {
-    Local<Value> tmp = obj->Get(value_symbol);
+  else if (type->StrictEquals(scals)) {
+    Local<Value> tmp = obj->Get(vals);
     if (!tmp->IsString()) goto end;
-    String::AsciiValue value(tmp->ToString());
+    String::Utf8Value value(tmp->ToString());
 
     yaml_scalar_event_initialize(event, NULL, NULL,
         (yaml_char_t *)*value, value.length(),
         1, 1, YAML_ANY_SCALAR_STYLE);
   }
 
-  else if (type->StrictEquals(sequence_start_symbol)) {
+  else if (type->StrictEquals(seq_starts)) {
     yaml_sequence_start_event_initialize(event, NULL, NULL, 0, YAML_ANY_SEQUENCE_STYLE);
   }
 
-  else if (type->StrictEquals(sequence_end_symbol)) {
+  else if (type->StrictEquals(seq_ends)) {
     yaml_sequence_end_event_initialize(event);
   }
 
-  else if (type->StrictEquals(mapping_start_symbol)) {
+  else if (type->StrictEquals(mss)) {
     yaml_mapping_start_event_initialize(event, NULL, NULL, 0, YAML_ANY_MAPPING_STYLE);
   }
 
-  else if (type->StrictEquals(mapping_end_symbol)) {
+  else if (type->StrictEquals(mes)) {
     yaml_mapping_end_event_initialize(event);
   }
 
@@ -266,49 +332,55 @@ end:
 static inline Local<Value>
 ParserErrorToJs(yaml_parser_t &parser)
 {
-  Local<String> problem = String::New(
+  Isolate* iso = Isolate::GetCurrent();
+  Handle<String> offset_sym = PersistentToLocal(iso, offset_symbol);
+  Handle<String> value_sym = PersistentToLocal(iso, value_symbol);
+  Handle<String> desc_sym = PersistentToLocal(iso, description_symbol);
+  Handle<String> prob_sym = PersistentToLocal(iso, problem_symbol);
+  Handle<String> cont_sym = PersistentToLocal(iso, context_symbol);
+  Local<String> problem = String::NewFromUtf8( iso,
       parser.problem ? parser.problem : "Unknown error");
 
   Local<Object> error, mark;
   switch (parser.error) {
     case YAML_READER_ERROR:
-      problem = String::Concat(problem, String::New(", at byte offset "));
+      problem = String::Concat(problem, String::NewFromUtf8(iso,", at byte offset "));
       problem = String::Concat(problem,
-          Integer::NewFromUnsigned(parser.problem_offset)->ToString());
+			       Integer::NewFromUnsigned(iso,parser.problem_offset)->ToString());
       error = Local<Object>::Cast(Exception::Error(problem));
 
-      mark = Object::New();
-      mark->Set(offset_symbol, Integer::NewFromUnsigned(parser.problem_offset));
-      mark->Set(value_symbol, Integer::NewFromUnsigned(parser.problem_value));
+      mark = Object::New(iso);
+      mark->Set(offset_sym, Integer::NewFromUnsigned(iso,parser.problem_offset));
+      mark->Set(value_sym, Integer::NewFromUnsigned(iso,parser.problem_value));
       if (parser.problem != NULL)
-        mark->Set(description_symbol, String::New(parser.problem));
-      error->Set(problem_symbol, mark);
+        mark->Set(desc_sym, String::NewFromUtf8(iso,parser.problem));
+      error->Set(prob_sym, mark);
 
       break;
 
     case YAML_SCANNER_ERROR:
     case YAML_PARSER_ERROR:
       if (parser.context != NULL) {
-        problem = String::Concat(problem, String::New(", "));
-        problem = String::Concat(problem, String::New(parser.context));
+        problem = String::Concat(problem, String::NewFromUtf8(iso,", "));
+        problem = String::Concat(problem, String::NewFromUtf8(iso,parser.context));
       }
       if (parser.problem != NULL) {
-        problem = String::Concat(problem, String::New(", on line "));
+        problem = String::Concat(problem, String::NewFromUtf8(iso,", on line "));
         problem = String::Concat(problem,
-            Integer::NewFromUnsigned(parser.problem_mark.line)->ToString());
+				 Integer::NewFromUnsigned(iso,parser.problem_mark.line)->ToString());
       }
       error = Local<Object>::Cast(Exception::Error(problem));
 
       if (parser.context != NULL) {
         mark = MarkToJs(parser.context_mark);
-        mark->Set(description_symbol, String::New(parser.context));
-        error->Set(context_symbol, mark);
+        mark->Set(desc_sym, String::NewFromUtf8(iso,parser.context));
+        error->Set(cont_sym, mark);
       }
 
       if (parser.problem != NULL) {
         mark = MarkToJs(parser.problem_mark);
-        mark->Set(description_symbol, String::New(parser.problem));
-        error->Set(problem_symbol, mark);
+        mark->Set(desc_sym, String::NewFromUtf8(iso,parser.problem));
+        error->Set(prob_sym, mark);
       }
 
       break;
@@ -325,10 +397,11 @@ ParserErrorToJs(yaml_parser_t &parser)
 static inline Local<Value>
 EmitterErrorToJs(yaml_emitter_t &emitter)
 {
+  Isolate* iso = Isolate::GetCurrent();
   if (emitter.error == YAML_EMITTER_ERROR)
-    return Exception::Error(String::New(emitter.problem));
+    return Exception::Error(String::NewFromUtf8(iso,emitter.problem));
   else
-    return Exception::Error(String::New("Unknown error"));
+    return Exception::Error(String::NewFromUtf8(iso,"Unknown error"));
 }
 
 
@@ -337,21 +410,28 @@ EmitterErrorToJs(yaml_emitter_t &emitter)
 //     parse(input, handler);
 //
 // Where `input` is a string, and `handler` is a function receiving events.
-static Handle<Value>
-Parse(const Arguments &args)
+void
+Parse(const FunctionCallbackInfo<Value> &args)
 {
-  HandleScope scope;
+  Isolate* iso = Isolate::GetCurrent();
+  HandleScope scope(iso);
 
   // Check arguments.
-  if (args.Length() != 2)
-    return ThrowException(Exception::Error(
-        String::New("Two arguments were expected.")));
-  if (!args[0]->IsString())
-    return ThrowException(Exception::TypeError(
-        String::New("Input must be a string.")));
-  if (!args[1]->IsFunction())
-    return ThrowException(Exception::TypeError(
-        String::New("Handler must be a function.")));
+  if (args.Length() != 2) {
+    args.GetReturnValue().Set( iso->ThrowException(Exception::Error(
+						String::NewFromUtf8(iso,"Two arguments were expected."))));
+    return;
+  }
+  if (!args[0]->IsString()) {
+    args.GetReturnValue().Set( iso->ThrowException(Exception::TypeError(
+									String::NewFromUtf8(iso,"Input must be a string."))));
+    return;
+  }
+  if (!args[1]->IsFunction()) {
+     args.GetReturnValue().Set( iso->ThrowException(Exception::TypeError(
+									 String::NewFromUtf8(iso,"Handler must be a function."))));
+     return;
+  }
 
   // Dereference arguments.
   String::Value value(args[0]);
@@ -371,9 +451,11 @@ Parse(const Arguments &args)
 
   // Initialize parser.
   yaml_parser_t parser;
-  if (!yaml_parser_initialize(&parser))
-    return ThrowException(Exception::Error(
-        String::New("Could not initiaize libYAML")));
+  if (!yaml_parser_initialize(&parser)) {
+     args.GetReturnValue().Set( iso->ThrowException(Exception::Error(
+								     String::NewFromUtf8(iso,"Could not initiaize libYAML"))));
+     return;
+  }
   // FIXME: Detect endianness?
   yaml_parser_set_encoding(&parser, YAML_UTF16LE_ENCODING);
   yaml_parser_set_input_string(&parser, string, size);
@@ -382,12 +464,13 @@ Parse(const Arguments &args)
   yaml_event_t event;
   while (true) {
     // Get the next event, or throw an exception.
-    if (yaml_parser_parse(&parser, &event) == 0)
-      return ThrowException(ParserErrorToJs(parser));
-
+    if (yaml_parser_parse(&parser, &event) == 0) {
+      args.GetReturnValue().Set( iso->ThrowException(ParserErrorToJs(parser)));
+      break;
+    }
     // Call the handler method.
     Local<Value> params[1] = { EventToJs(event) };
-    handler->Call(Context::GetCurrent()->Global(), 1, params);
+    handler->Call(iso->GetCurrentContext()->Global(), 1, params);
 
     // Clean up the event.
     if (event.type == YAML_STREAM_END_EVENT) {
@@ -402,7 +485,7 @@ Parse(const Arguments &args)
   // Clean up the parser.
   yaml_parser_delete(&parser);
 
-  return Undefined();
+  //  return Undefined(iso);
 }
 
 
@@ -412,81 +495,106 @@ Parse(const Arguments &args)
 //     emitter.event({ type: 'streamStart' });
 //
 // The constructor takes a function called with output data as LibYAML provides it.
-class Emitter : ObjectWrap
+class Emitter : public ObjectWrap
 {
 public:
   static void
   Initialize(Handle<Object> target)
   {
-    Local<FunctionTemplate> t = FunctionTemplate::New(New);
+    Isolate* iso = Isolate::GetCurrent();
+    Local<FunctionTemplate> t = FunctionTemplate::New(iso,Emitter::New);
     t->InstanceTemplate()->SetInternalFieldCount(1);
 
     NODE_SET_PROTOTYPE_METHOD(t, "event", Event);
 
-    target->Set(String::NewSymbol("Emitter"), t->GetFunction());
+    target->Set(String::NewFromUtf8(iso,"Emitter"), t->GetFunction());
   }
 
   virtual
   ~Emitter()
   {
-    writeCallback_.Dispose();
+    writeCallback_.Reset();
     yaml_emitter_delete(&emitter_);
   }
 
 private:
   Emitter() {}
 
-  static Handle<Value>
-  New(const Arguments &args)
+  //  static Handle<Value>
+  static void
+  New(const FunctionCallbackInfo<Value> &args)
   {
-    if (args.Length() != 1)
-      return ThrowException(Exception::TypeError(
-          String::New("Expected one argument")));
-    if (!args[0]->IsFunction())
-      return ThrowException(Exception::TypeError(
-          String::New("Expected a function")));
+    Isolate* iso = Isolate::GetCurrent();
+    HandleScope scope(iso);
+
+    if (args.Length() != 1) {
+      args.GetReturnValue().Set( iso->ThrowException(Exception::TypeError(
+									  String::NewFromUtf8(iso,"Expected one argument"))));
+      return;
+    }
+
+    if (!args[0]->IsFunction()) {
+      args.GetReturnValue().Set( iso->ThrowException(Exception::TypeError(
+									  String::NewFromUtf8(iso,"Expected a function"))));
+      return;
+    }
 
     Emitter *e = new Emitter();
 
-    if (!yaml_emitter_initialize(&e->emitter_))
-      return ThrowException(Exception::Error(
-          String::New("Could not initiaize libYAML")));
+    if (!yaml_emitter_initialize(&e->emitter_)) {
+      args.GetReturnValue().Set( iso->ThrowException(Exception::Error(
+								      String::NewFromUtf8(iso,"Could not initiaize libYAML"))));
+      return;
+    }
+
     // FIXME: Detect endianness?
     yaml_emitter_set_encoding(&e->emitter_, YAML_UTF16LE_ENCODING);
     yaml_emitter_set_output(&e->emitter_, WriteHandler, e);
 
-    e->writeCallback_ = Persistent<Function>::New(
-        Handle<Function>::Cast(args[0]));
+    Handle<Function> hf = Handle<Function>::Cast(args[0]);
+    e->writeCallback_.Reset(iso, hf);
 
     e->Wrap(args.This());
-    return e->handle_;
+    args.GetReturnValue().Set(args.This());
   }
 
-  static Handle<Value>
-  Event(const Arguments &args)
+  //  static Handle<Value>
+  static void
+  Event(const FunctionCallbackInfo<Value> &args)
   {
-    if (args.Length() != 1)
-      return ThrowException(Exception::TypeError(
-          String::New("Expected one argument")));
-    if (!args[0]->IsObject())
-      return ThrowException(Exception::TypeError(
-          String::New("Expected an object")));
+    Isolate* iso = Isolate::GetCurrent();
+    HandleScope scope(iso);
+
+    if (args.Length() != 1) {
+      args.GetReturnValue().Set( iso->ThrowException(Exception::TypeError(
+									  String::NewFromUtf8(iso,"Expected one argument"))));
+      return;
+    }
+
+    if (!args[0]->IsObject()) {
+      args.GetReturnValue().Set( iso->ThrowException(Exception::TypeError(
+									  String::NewFromUtf8(iso,"Expected an object"))));
+      return;
+    }
+
     Local<Object> obj = Local<Object>::Cast(args[0]);
 
     Emitter *e = ObjectWrap::Unwrap<Emitter>(args.This());
 
     yaml_event_t *ev = JsToEvent(obj);
-    if (yaml_emitter_emit(&e->emitter_, ev) == 0)
-      return ThrowException(EmitterErrorToJs(e->emitter_));
-
-    return Undefined();
+    if (yaml_emitter_emit(&e->emitter_, ev) == 0) {
+      args.GetReturnValue().Set(iso->ThrowException(EmitterErrorToJs(e->emitter_)));
+      return;
+    } else
+      args.GetReturnValue().Set(Undefined(iso));
   }
 
   static int
   WriteHandler(void *data, unsigned char *buffer, size_t size)
   {
+    Isolate* iso = Isolate::GetCurrent();
     Emitter *e = (Emitter *)data;
-    HandleScope scope;
+    HandleScope scope(iso);
 
     // V8 expects UTF-16 as uint16_t.
     const uint16_t *string = (const uint16_t *)buffer;
@@ -500,8 +608,9 @@ private:
 
     // Call the write callback.
     TryCatch try_catch;
-    Local<Value> params[1] = { String::New(string, size) };
-    e->writeCallback_->Call(Context::GetCurrent()->Global(), 1, params);
+    Local<Value> params[1] = { String::NewFromTwoByte(iso, string, String::kNormalString, (int)size) };
+    Handle<Function> f = PersistentToLocal(iso, e->writeCallback_);
+    f->Call(iso->GetCurrentContext()->Global(), 1, params);
     if (try_catch.HasCaught()) {
       FatalException(try_catch);
       return 0;
@@ -520,54 +629,56 @@ private:
 static void
 Initialize(Handle<Object> target)
 {
-  HandleScope scope;
+  Isolate* iso = Isolate::GetCurrent();
+  HandleScope scope(iso);
+  
+  stream_start_symbol   .Reset(iso,String::NewFromUtf8(iso,"streamStart"));
+  stream_end_symbol     .Reset(iso,String::NewFromUtf8(iso,"streamEnd"));
+  document_start_symbol .Reset(iso,String::NewFromUtf8(iso,"documentStart"));
+  document_end_symbol   .Reset(iso,String::NewFromUtf8(iso,"documentEnd"));
+  alias_symbol          .Reset(iso,String::NewFromUtf8(iso,"alias"));
+  scalar_symbol         .Reset(iso,String::NewFromUtf8(iso,"scalar"));
+  sequence_start_symbol .Reset(iso,String::NewFromUtf8(iso,"sequenceStart"));
+  sequence_end_symbol   .Reset(iso,String::NewFromUtf8(iso,"sequenceEnd"));
+  mapping_start_symbol  .Reset(iso,String::NewFromUtf8(iso,"mappingStart"));
+  mapping_end_symbol    .Reset(iso,String::NewFromUtf8(iso,"mappingEnd"));
 
-  stream_start_symbol   = NODE_PSYMBOL("streamStart");
-  stream_end_symbol     = NODE_PSYMBOL("streamEnd");
-  document_start_symbol = NODE_PSYMBOL("documentStart");
-  document_end_symbol   = NODE_PSYMBOL("documentEnd");
-  alias_symbol          = NODE_PSYMBOL("alias");
-  scalar_symbol         = NODE_PSYMBOL("scalar");
-  sequence_start_symbol = NODE_PSYMBOL("sequenceStart");
-  sequence_end_symbol   = NODE_PSYMBOL("sequenceEnd");
-  mapping_start_symbol  = NODE_PSYMBOL("mappingStart");
-  mapping_end_symbol    = NODE_PSYMBOL("mappingEnd");
+  index_symbol  .Reset(iso,String::NewFromUtf8(iso,"index"));
+  line_symbol   .Reset(iso,String::NewFromUtf8(iso,"line"));
+  column_symbol .Reset(iso,String::NewFromUtf8(iso,"column"));
 
-  index_symbol  = NODE_PSYMBOL("index");
-  line_symbol   = NODE_PSYMBOL("line");
-  column_symbol = NODE_PSYMBOL("column");
+  start_symbol    .Reset(iso,String::NewFromUtf8(iso,"start"));
+  end_symbol      .Reset(iso,String::NewFromUtf8(iso,"end"));
+  type_symbol     .Reset(iso,String::NewFromUtf8(iso,"type"));
+  major_symbol    .Reset(iso,String::NewFromUtf8(iso,"major"));
+  minor_symbol    .Reset(iso,String::NewFromUtf8(iso,"minor"));
+  version_symbol  .Reset(iso,String::NewFromUtf8(iso,"version"));
+  implicit_symbol .Reset(iso,String::NewFromUtf8(iso,"implicit"));
+  anchor_symbol   .Reset(iso,String::NewFromUtf8(iso,"anchor"));
+  tag_symbol      .Reset(iso,String::NewFromUtf8(iso,"tag"));
+  value_symbol    .Reset(iso,String::NewFromUtf8(iso,"value"));
+  plain_implicit_symbol  .Reset(iso,String::NewFromUtf8(iso,"plain_implicit"));
+  quoted_implicit_symbol .Reset(iso,String::NewFromUtf8(iso,"quoted_implicit"));
+  style_symbol    .Reset(iso,String::NewFromUtf8(iso,"style"));
 
-  start_symbol    = NODE_PSYMBOL("start");
-  end_symbol      = NODE_PSYMBOL("end");
-  type_symbol     = NODE_PSYMBOL("type");
-  major_symbol    = NODE_PSYMBOL("major");
-  minor_symbol    = NODE_PSYMBOL("minor");
-  version_symbol  = NODE_PSYMBOL("version");
-  implicit_symbol = NODE_PSYMBOL("implicit");
-  anchor_symbol   = NODE_PSYMBOL("anchor");
-  tag_symbol      = NODE_PSYMBOL("tag");
-  value_symbol    = NODE_PSYMBOL("value");
-  plain_implicit_symbol  = NODE_PSYMBOL("plain_implicit");
-  quoted_implicit_symbol = NODE_PSYMBOL("quoted_implicit");
-  style_symbol    = NODE_PSYMBOL("style");
+  plain_symbol   .Reset(iso,String::NewFromUtf8(iso,"plain"));
+  single_quoted_symbol .Reset(iso,String::NewFromUtf8(iso,"single-quoted"));
+  double_quoted_symbol .Reset(iso,String::NewFromUtf8(iso,"double-quoted"));
+  literal_symbol .Reset(iso,String::NewFromUtf8(iso,"literal"));
+  folded_symbol  .Reset(iso,String::NewFromUtf8(iso,"folded"));
 
-  plain_symbol   = NODE_PSYMBOL("plain");
-  single_quoted_symbol = NODE_PSYMBOL("single-quoted");
-  double_quoted_symbol = NODE_PSYMBOL("double-quoted");
-  literal_symbol = NODE_PSYMBOL("literal");
-  folded_symbol  = NODE_PSYMBOL("folded");
+  block_symbol .Reset(iso,String::NewFromUtf8(iso,"block"));
+  flow_symbol  .Reset(iso,String::NewFromUtf8(iso,"flow"));
 
-  block_symbol = NODE_PSYMBOL("block");
-  flow_symbol  = NODE_PSYMBOL("flow");
+  offset_symbol      .Reset(iso,String::NewFromUtf8(iso,"offset"));
+  // value_symbol    .Reset(iso,String::NewFromUtf8(iso,"value"));
+  context_symbol     .Reset(iso,String::NewFromUtf8(iso,"context"));
+  problem_symbol     .Reset(iso,String::NewFromUtf8(iso,"problem"));
+  description_symbol .Reset(iso,String::NewFromUtf8(iso,"description"));
 
-  offset_symbol      = NODE_PSYMBOL("offset");
-  // value_symbol    = NODE_PSYMBOL("value");
-  context_symbol     = NODE_PSYMBOL("context");
-  problem_symbol     = NODE_PSYMBOL("problem");
-  description_symbol = NODE_PSYMBOL("description");
 
-  Local<FunctionTemplate> parse_template = FunctionTemplate::New(Parse);
-  target->Set(String::NewSymbol("parse"), parse_template->GetFunction());
+  Local<FunctionTemplate> parse_template = FunctionTemplate::New(iso,Parse);
+  target->Set(String::NewFromUtf8(iso,"parse"), parse_template->GetFunction());
 
   Emitter::Initialize(target);
 }
