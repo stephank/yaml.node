@@ -3,7 +3,10 @@
 
 #include <v8.h>
 #include <node.h>
+
+extern "C" {
 #include <yaml.h>
+}
 
 using namespace v8;
 using namespace node;
