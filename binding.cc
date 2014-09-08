@@ -210,8 +210,8 @@ JsToEvent(Local<Object> &obj)
   Local<Value> type = obj->Get(type_symbol);
 
   if (type->StrictEquals(stream_start_symbol)) {
-    // FIXME: Detect endianness?
-    yaml_stream_start_event_initialize(event, YAML_ANY_ENCODING);
+    // Default to UTF8 input in events.
+    yaml_stream_start_event_initialize(event, YAML_UTF8_ENCODING);
   }
 
   else if (type->StrictEquals(stream_end_symbol)) {
@@ -229,7 +229,7 @@ JsToEvent(Local<Object> &obj)
   else if (type->StrictEquals(alias_symbol)) {
     Local<Value> tmp = obj->Get(anchor_symbol);
     if (!tmp->IsString()) goto end;
-    String::AsciiValue anchor(tmp->ToString());
+    String::Utf8Value anchor(tmp);
 
     yaml_alias_event_initialize(event, (yaml_char_t *)*anchor);
   }
@@ -237,7 +237,7 @@ JsToEvent(Local<Object> &obj)
   else if (type->StrictEquals(scalar_symbol)) {
     Local<Value> tmp = obj->Get(value_symbol);
     if (!tmp->IsString()) goto end;
-    String::AsciiValue value(tmp->ToString());
+    String::Utf8Value value(tmp);
 
     yaml_scalar_event_initialize(event, NULL, NULL,
         (yaml_char_t *)*value, value.length(),
@@ -456,6 +456,8 @@ private:
           String::New("Could not initiaize libYAML")));
     // FIXME: Detect endianness?
     yaml_emitter_set_encoding(&e->emitter_, YAML_UTF16LE_ENCODING);
+    // Don't escape unicode in output
+    yaml_emitter_set_unicode(&e->emitter_, 1);
     yaml_emitter_set_output(&e->emitter_, WriteHandler, e);
 
     e->writeCallback_ = Persistent<Function>::New(
